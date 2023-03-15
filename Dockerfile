@@ -1,21 +1,33 @@
-ARG IMAGE=ubuntu:20.04
+ARG IMAGE=public.ecr.aws/emr-serverless/spark/emr-6.10.0:20230210-x86_64
 FROM ${IMAGE}
 
-ARG DEBIAN_FRONTEND=noninteractive
+USER root
 
-RUN apt-get update
+RUN yum -y update && yum install -y sudo
 
 COPY . /turboseti
 WORKDIR /turboseti
 
-RUN cat dependencies.txt | xargs -n 1 apt install --no-install-recommends -y
+#RUN cat dependencies.txt | xargs -n 1 yum install -y
+#RUN xargs -n 1 yum install -y < dependencies.txt
+RUN amazon-linux-extras install epel -y
+RUN yum install -y hdf5-devel
+RUN yum install -y python3-pip
+RUN yum install -y yum install python3-devel.x86_64
+RUN yum install -y python3-setuptools
+#RUN yum install -y libhdf5-dev
+RUN yum install -y gcc
+RUN yum install -y gcc-gfortran
+RUN yum install -y wget
+RUN yum install -y curl
+RUN yum install -y git
 
 RUN python3 -m pip install -U pip
 RUN python3 -m pip install git+https://github.com/UCBerkeleySETI/blimpy
 RUN python3 -m pip install -r requirements.txt
 RUN python3 -m pip install -r requirements_test.txt
 RUN python3 setup.py install
-RUN cd test && python3 download_test_data.py && cd ..
+#RUN cd test && python3 download_test_data.py && cd ..
 # RUN cd test && bash run_tests.sh && cd ..
 
 RUN find test -name "*.h5" -type f -delete
