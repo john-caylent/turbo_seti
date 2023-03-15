@@ -25,7 +25,7 @@ OFFNIL_H5 = 'single_coarse_guppi_59046_80036_DIAG_VOYAGER-1_0011.rawspec.0000.h5
 MAX_DRIFT = 2.0
 MIN_SNR = 10.0
 
-TESTS =  [
+TESTS = [
     (Kernels(gpu_backend=False, precision=2)),
     (Kernels(gpu_backend=False, precision=1)),
 ]
@@ -57,14 +57,17 @@ def find_doppler(filename_fil, kernels):
     t0 = time.time()
     find_seti_event.search()
     t_taken = time.time() - t0
-    print("Time taken for find_seti_event.search() [without flagging]: %2.2fs" % t_taken)
+    print(
+        "Time taken for find_seti_event.search() [without flagging]: %2.2fs" % t_taken)
 
     find_seti_event.flagging = True
     t0 = time.time()
     for dummy, data_dict in enumerate(find_seti_event.data_handle.cchan_list):
-        search_coarse_channel(data_dict, find_seti_event, filewriter=None, logwriter=None)
+        search_coarse_channel(data_dict, find_seti_event,
+                              filewriter=None, logwriter=None)
     t_taken = time.time() - t0
-    print("Time taken for search_coarse_channe() [with flagging]: %2.2fs" % t_taken)
+    print(
+        "Time taken for search_coarse_channel() [with flagging]: %2.2fs" % t_taken)
 
 
 def plot_hit(fil_filename, dat_filename, hit_id, bw=None, offset=0):
@@ -91,7 +94,8 @@ def plot_hit(fil_filename, dat_filename, hit_id, bw=None, offset=0):
     else:
         bw_mhz = bw * 1e-6
 
-    fil = Waterfall(fil_filename, f_start=f0 - bw_mhz / 2, f_stop=f0 + bw_mhz / 2)
+    fil = Waterfall(fil_filename, f_start=f0 -
+                    bw_mhz / 2, f_stop=f0 + bw_mhz / 2)
     t_duration = (fil.n_ints_in_file - 1) * fil.header['tsamp']
 
     fil.plot_waterfall()
@@ -124,20 +128,20 @@ def validate_voyager_hits(filename_dat):
     df_hits = find_event.read_dat(filename_dat)
     print(df_hits)
 
-    valid_data = [ # in unflipped order
-        { # 001
+    valid_data = [  # in unflipped order
+        {  # 001
             'Freq': 8419.319368,
             'FreqStart': 8419.32,
             'FreqEnd': 8419.32,
             'SNR': 30.612128,
         },
-        { # 002
+        {  # 002
             'Freq': 8419.30,
             'FreqStart': 8419.30,
             'FreqEnd': 8419.30,
             'SNR': 245.707984,
         },
-        { # 003
+        {  # 003
             'Freq': 8419.274374,
             'FreqStart': 8419.27,
             'FreqEnd': 8419.27,
@@ -148,19 +152,20 @@ def validate_voyager_hits(filename_dat):
     atols = {'Freq': 0.001, 'FreqStart': 0.001, 'FreqEnd': 0.001, 'SNR': 0.001}
 
     for vd in valid_data:
-        hmax = df_hits[np.isclose(df_hits['Freq'], vd['Freq'], rtol=0.000001)].iloc[0]
+        hmax = df_hits[np.isclose(
+            df_hits['Freq'], vd['Freq'], rtol=0.000001)].iloc[0]
         for key in vd.keys():
-            #print('validate_voyager_hits: key, hmax[key], vd[key]: ', key, hmax[key], vd[key])
+            # print('validate_voyager_hits: key, hmax[key], vd[key]: ', key, hmax[key], vd[key])
             if key in ('FreqStart', 'FreqEnd'):
                 upper = np.isclose(hmax[key], vd['FreqStart'], atol=atols[key])
                 lower = np.isclose(hmax[key], vd['FreqEnd'], atol=atols[key])
                 if not (upper and lower):
                     raise ValueError('validate_voyager_hits: upper or lower: hmax[key]={}, vd[FreqStart]={}, vd[FreqEnd]={}'
-                          .format(hmax[key], vd['FreqStart'], vd['FreqEnd']))
+                                     .format(hmax[key], vd['FreqStart'], vd['FreqEnd']))
             else:
                 if not np.isclose(hmax[key], vd[key], atol=atols[key]):
                     raise ValueError('validate_voyager_hits: other: key={}, hmax[key]={}, vd[key]={}'
-                          .format(key, hmax[key], vd[key]))
+                                     .format(key, hmax[key], vd[key]))
 
     print('\nvalidate_voyager_hits: SUCCESS\n')
 
@@ -208,7 +213,8 @@ def test_turboSETI_entry_point():
     seti_event.main(args)
     print("\n===== test_turboSETI_entry_point 3 =====")
     h5_3 = os.path.join(TESTDIR, OFFNIL_H5)
-    args = [h5_3, "-l", "debug", "-s", str(MIN_SNR), "-M", str(MAX_DRIFT), "-o", TESTDIR, ]
+    args = [h5_3, "-l", "debug", "-s",
+            str(MIN_SNR), "-M", str(MAX_DRIFT), "-o", TESTDIR, ]
     seti_event.main(args)
     print("\n===== test_turboSETI_entry_point 4 =====")
     h5_4 = os.path.join(TESTDIR, OFFNIL_H5)
@@ -219,15 +225,18 @@ def test_turboSETI_entry_point():
     seti_event.main(args)
     print("\n===== test_turboSETI_entry_point 5 =====")
     h5_5 = os.path.join(TESTDIR, OFFNIL_H5)
-    args = [h5_5, "-P", "y", "-s", str(MIN_SNR), "-M", str(MAX_DRIFT), "-o", TESTDIR, ]
+    args = [h5_5, "-P", "y", "-s",
+            str(MIN_SNR), "-M", str(MAX_DRIFT), "-o", TESTDIR, ]
     seti_event.main(args)
     print("\n===== test_turboSETI_entry_point 6 =====")
     h5_5 = os.path.join(TESTDIR, VOYAH5)
-    args = [h5_5, "--blank_dc", "y", "-s", str(MIN_SNR), "-M", str(MAX_DRIFT), "-o", TESTDIR, ]
+    args = [h5_5, "--blank_dc", "y", "-s",
+            str(MIN_SNR), "-M", str(MAX_DRIFT), "-o", TESTDIR, ]
     seti_event.main(args)
     print("\n===== test_turboSETI_entry_point 7 =====")
     h5_5 = os.path.join(TESTDIR, VOYAH5)
-    args = [h5_5, "--blank_dc", "n", "-s", str(MIN_SNR), "-M", str(MAX_DRIFT), "-o", TESTDIR, ]
+    args = [h5_5, "--blank_dc", "n", "-s",
+            str(MIN_SNR), "-M", str(MAX_DRIFT), "-o", TESTDIR, ]
     seti_event.main(args)
 
 
@@ -241,11 +250,11 @@ def test_make_waterfall_plots():
 
     # Test make_waterfall_plots -- needs 6x files
     filenames_list = [filename_fil] * 6
-    target  = 'Voyager'
-    drate   = -0.392226
-    fmid   =  8419.274785
+    target = 'Voyager'
+    drate = -0.392226
+    fmid = 8419.274785
     f_start = 8419.274374 - 600e-6
-    f_stop  = 8419.274374 + 600e-6
+    f_stop = 8419.274374 + 600e-6
     source_name_list = ['test_make_waterfall_plots'] * 6
     filter_level = "1"
     plot_event.make_waterfall_plots(filenames_list,
@@ -263,9 +272,11 @@ def test_data_handler(kernels):
     r""" Basic data handler test """
     print("\n===== test_data_handler =====")
     with pytest.raises(IOError):
-        data_handler.DATAHandle(filename='made_up_not_existing_file.h5', kernels=kernels)
+        data_handler.DATAHandle(
+            filename='made_up_not_existing_file.h5', kernels=kernels)
     with pytest.raises(IOError):
-        data_handler.DATAHandle(filename=os.path.abspath(__file__), kernels=kernels)
+        data_handler.DATAHandle(
+            filename=os.path.abspath(__file__), kernels=kernels)
     filename_fil = os.path.join(TESTDIR, VOYAFIL)
     dh = data_handler.DATAHandle(filename=filename_fil,
                                  out_dir=os.path.join(tempfile.mkdtemp()),
@@ -281,12 +292,13 @@ def test_data_handler(kernels):
     assert dh.status
 
 
-### Do not run dask partitions with GPU due to GPU RAM availability issues.
+# Do not run dask partitions with GPU due to GPU RAM availability issues.
 def test_dask():
     r""" Test dask capability on Voyager data """
     print("\n===== test_dask ===== begin")
     filename_h5 = os.path.join(TESTDIR, VOYAH5)
-    FD = FindDoppler(datafile=filename_h5, max_drift=MAX_DRIFT, out_dir=TESTDIR)
+    FD = FindDoppler(datafile=filename_h5,
+                     max_drift=MAX_DRIFT, out_dir=TESTDIR)
     print("===== test_dask ===== n_partitions=None")
     FD.search()
     print("===== test_dask ===== n_partitions=2")
@@ -296,7 +308,8 @@ def test_dask():
     print("===== test_dask ===== merge resulted in a DAT for both flipped and unflipped H5")
     unflipped_dat = filename_h5.replace('.h5', '.dat')
     filename_h5 = os.path.join(TESTDIR, VOYAH5FLIPPED)
-    FD = FindDoppler(datafile=filename_h5, max_drift=MAX_DRIFT, out_dir=TESTDIR)
+    FD = FindDoppler(datafile=filename_h5,
+                     max_drift=MAX_DRIFT, out_dir=TESTDIR)
     FD.search(n_partitions=2)
     flipped_dat = filename_h5.replace('.h5', '.dat')
     assert os.path.exists(unflipped_dat)

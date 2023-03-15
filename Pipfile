@@ -1,0 +1,21 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+astropy = "*"
+numpy = "*"
+blimpy = ">=2.0.34"
+pandas = "*"
+toolz = "*"
+fsspec = "*"
+dask = {extras = ["bag"], version = "*"}
+numba = "*"
+cloudpickle = "*"
+
+[dev-packages]
+
+[requires]
+python_version = "3.10.8"
+pyenv = "seti3108"

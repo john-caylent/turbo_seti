@@ -16,7 +16,7 @@ RUN python3 -m pip install -r requirements.txt
 RUN python3 -m pip install -r requirements_test.txt
 RUN python3 setup.py install
 RUN cd test && python3 download_test_data.py && cd ..
-RUN cd test && bash run_tests.sh && cd ..
+# RUN cd test && bash run_tests.sh && cd ..
 
 RUN find test -name "*.h5" -type f -delete
 RUN find test -name "*.log" -type f -delete

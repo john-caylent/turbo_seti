@@ -25,10 +25,10 @@ FILE2 = "single_coarse_guppi_59046_80036_DIAG_VOYAGER-1_0011.rawspec.0000.h5"
 def oops(msg):
     print("\n*** OOPS, {} !!!\n".format(msg))
     sys.exit(86)
-    
+
 
 def check_h5(path):
-    
+
     try:
         h5 = h5py.File(path, mode='r')
     except:
@@ -45,7 +45,8 @@ def download_test_data():
         pass
     print("Begin downloads .....\n")
 
-    exit_status = os.system("curl --url '{}/{}'  -o ./{}".format(URL2, FILE2, FILE2))
+    exit_status = os.system(
+        "curl --url '{}/{}'  -o ./{}".format(URL2, FILE2, FILE2))
     if exit_status != 0:
         oops("cannot download {}".format(FILE2))
     sz = os.path.getsize(FILE2)
@@ -53,14 +54,15 @@ def download_test_data():
         oops("Downloaded file {} is way too small, size={}".format(FILE2, sz))
     check_h5(FILE2)
 
-    exit_status = os.system("curl --url '{}/{}'  -o ./{}".format(URL1, FILE1, FILE1))
+    exit_status = os.system(
+        "curl --url '{}/{}'  -o ./{}".format(URL1, FILE1, FILE1))
     if exit_status != 0:
         oops("cannot download {}".format(FILE1))
     sz = os.path.getsize(FILE1)
     if sz < MIN_SIZE:
-       oops("Downloaded file {} is way too small, size={}".format(FILE1, sz))
+        oops("Downloaded file {} is way too small, size={}".format(FILE1, sz))
     check_h5(FILE1)
-        
+
     print("\nDownloads ok.")
 
 
@@ -86,8 +88,8 @@ def flip_data(filename):
     with h5py.File(flipped_filename, 'r+') as h:
         foff_orig = h['data'].attrs['foff']
         fch1_orig = h['data'].attrs['fch1']
-        nchans    = h['data'].attrs['nchans']
-        fchN      = fch1_orig + (foff_orig * nchans)
+        nchans = h['data'].attrs['nchans']
+        fchN = fch1_orig + (foff_orig * nchans)
         h['data'].attrs['foff'] = foff_orig * -1
         h['data'].attrs['fch1'] = fchN
         h['data'].attrs['source_name'] = 'Voyager1Flipped'

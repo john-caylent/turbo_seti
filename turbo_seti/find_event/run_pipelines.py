@@ -32,7 +32,7 @@ RETURN_NORMAL = 0
 RETURN_ERROR = 1
 
 HELP_EPILOGUE = \
-"""
+    """
 Optional Filtering Parameters
 --------------------------------------
 The following parameters can be used to prune hits from the dat files,
@@ -274,9 +274,9 @@ def execute_pipelines(args):
     if not os.path.exists(out_dir):
         os.mkdir(out_dir)
     if args.plot_offset:
-        offset="auto"
+        offset = "auto"
     else:
-        offset=0
+        offset = 0
 
     # Establish output pathnames,
     path_csvf = out_dir + NAME_CSVF
@@ -290,18 +290,21 @@ def execute_pipelines(args):
         SZ_user_list = len(args.h5dat_lists)
     if args.debug:
         print(f"DEBUG h5dats_list: #{SZ_user_list} {args.h5dat_lists}")
-    if SZ_user_list == 0: # Default to auto-generation.
+    if SZ_user_list == 0:  # Default to auto-generation.
         path_h5_list = out_dir + NAME_H5_LIST
         path_dat_list = out_dir + NAME_DAT_LIST
-        number_in_cadence = make_lists(h5_dir, path_h5_list, dat_dir, path_dat_list)
+        number_in_cadence = make_lists(
+            h5_dir, path_h5_list, dat_dir, path_dat_list)
         if number_in_cadence == 0:
             return RETURN_ERROR
-    else: # User-specified lists
+    else:  # User-specified lists
         if SZ_user_list != 2:
-            print(f"\n*** plotSETI: h5dat_lists had {SZ_user_list} elements; must be 2 (one for h5 and one for dat)!")
+            print(
+                f"\n*** plotSETI: h5dat_lists had {SZ_user_list} elements; must be 2 (one for h5 and one for dat)!")
             return RETURN_ERROR
         if args.h5dat_lists[0] is None or args.h5dat_lists[1] is None:
-            print(f"\n*** plotSETI: h5dat_lists had {SZ_user_list} elements; must be 2 (one for h5 and one for dat)!")
+            print(
+                f"\n*** plotSETI: h5dat_lists had {SZ_user_list} elements; must be 2 (one for h5 and one for dat)!")
             return RETURN_ERROR
         # Check the list of h5 files.
         path_h5_list = args.h5dat_lists[0]
@@ -326,33 +329,33 @@ def execute_pipelines(args):
     # Run find_event_pipeline()
     if complex_cadence:
         df_check = find_event_pipeline(path_dat_list,
-                            path_h5_list,
-                            filter_threshold = args.filter_threshold,
-                            number_in_cadence = number_in_cadence,
-                            on_source_complex_cadence=args.source_name,
-                            sortby_tstart=True,
-                            check_zero_drift=False,
-                            SNR_cut=args.snr_threshold,
-                            min_drift_rate=args.min_drift_rate,
-                            max_drift_rate=args.max_drift_rate,
-                            user_validation=False,
-                            csv_name=path_csvf,
-                            saving=True)
-    else: # not a complex cadence
+                                       path_h5_list,
+                                       filter_threshold=args.filter_threshold,
+                                       number_in_cadence=number_in_cadence,
+                                       on_source_complex_cadence=args.source_name,
+                                       sortby_tstart=True,
+                                       check_zero_drift=False,
+                                       SNR_cut=args.snr_threshold,
+                                       min_drift_rate=args.min_drift_rate,
+                                       max_drift_rate=args.max_drift_rate,
+                                       user_validation=False,
+                                       csv_name=path_csvf,
+                                       saving=True)
+    else:  # not a complex cadence
         df_check = find_event_pipeline(path_dat_list,
-                            path_h5_list,
-                            filter_threshold = args.filter_threshold,
-                            number_in_cadence = number_in_cadence,
-                            on_source_complex_cadence=False,
-                            on_off_first=first_file,
-                            sortby_tstart=True,
-                            check_zero_drift=False,
-                            SNR_cut=args.snr_threshold,
-                            min_drift_rate=args.min_drift_rate,
-                            max_drift_rate=args.max_drift_rate,
-                            user_validation=False,
-                            csv_name=path_csvf,
-                            saving=True)
+                                       path_h5_list,
+                                       filter_threshold=args.filter_threshold,
+                                       number_in_cadence=number_in_cadence,
+                                       on_source_complex_cadence=False,
+                                       on_off_first=first_file,
+                                       sortby_tstart=True,
+                                       check_zero_drift=False,
+                                       SNR_cut=args.snr_threshold,
+                                       min_drift_rate=args.min_drift_rate,
+                                       max_drift_rate=args.max_drift_rate,
+                                       user_validation=False,
+                                       csv_name=path_csvf,
+                                       saving=True)
 
     if df_check is None:
         print("\n*** plotSETI: No events produced in find_event_pipeline()!")
