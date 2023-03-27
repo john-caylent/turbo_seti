@@ -1,4 +1,4 @@
-ARG IMAGE=public.ecr.aws/emr-serverless/spark/emr-6.10.0:20230210-x86_64
+ARG IMAGE=755674844232.dkr.ecr.us-east-1.amazonaws.com/notebook-python/emr-6.10.0:latest
 FROM ${IMAGE}
 
 USER root
