@@ -37,4 +37,6 @@ RUN find test -name "*.fil" -type f -delete
 RUN find test -name "*.png" -type f -delete
 RUN find . -path '*/__pycache__*' -delete
 
-WORKDIR /home
+USER hadoop:hadoop
+
+WORKDIR /home/hadoop
