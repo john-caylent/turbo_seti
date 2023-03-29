@@ -23,7 +23,7 @@ RUN yum install -y curl
 RUN yum install -y git
 
 RUN python3 -m pip install -U pip
-RUN python3 -m pip install git+https://github.com/UCBerkeleySETI/blimpy
+RUN python3 -m pip install git+https://github.com/john-caylent/blimpy
 RUN python3 -m pip install -r requirements.txt
 RUN python3 -m pip install -r requirements_test.txt
 RUN python3 setup.py install
