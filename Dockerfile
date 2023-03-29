@@ -5,7 +5,7 @@ USER root
 
 RUN yum -y update && yum install -y sudo
 
-COPY . /turboseti
+COPY --chown=hadoop:hadoop . /turboseti
 WORKDIR /turboseti
 
 #RUN cat dependencies.txt | xargs -n 1 yum install -y
