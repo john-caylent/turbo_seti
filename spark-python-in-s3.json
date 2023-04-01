@@ -5,7 +5,7 @@
   "releaseLabel": "emr-6.9.0-latest", 
   "jobDriver": {
     "sparkSubmitJobDriver": {
-      "entryPoint": "local:///scripts/seti_example.py", 
+      "entryPoint": "s3://sandbox-terraform-aws-caylenttwo-emr/scripts/seti_example.py", 
       "entryPointArguments": ["https://slowikshare.s3.amazonaws.com/single_coarse_guppi_59046_80036_DIAG_VOYAGER-1_0011.rawspec.0000.h5","sandbox-terraform-aws-caylenttwo-emr","spark_output"],
        "sparkSubmitParameters": "--conf spark.executor.instances=1 --conf spark.executor.memory=2G --conf spark.driver.memory=2G --conf spark.executor.cores=2 --conf spark.driver.cores=1"
     }
