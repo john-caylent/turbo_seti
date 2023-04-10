@@ -7,6 +7,7 @@ RUN apt-get autoclean
 
 COPY . /turboseti
 WORKDIR /turboseti
+RUN chmod a+rwx /turboseti
 #RUN cat dependencies.txt | xargs -n 1 apt install --no-install-recommends -y
 RUN apt-get install -y python3-pip
 RUN apt-get install -y python3-dev
