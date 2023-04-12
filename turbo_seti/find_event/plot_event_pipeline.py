@@ -10,14 +10,18 @@ from operator import attrgetter
 import pandas
 from blimpy import Waterfall
 from . import plot_event
+from pyspark.sql import SparkSession
+spark = SparkSession.builder.appName("plot_event").getOrCreate()
 
 
 class PathRecord:
     r''' Definition of an H5 path record '''
+
     def __init__(self, path_h5, tstart, source_name):
         self.path_h5 = path_h5
         self.tstart = tstart
         self.source_name = source_name
+
     def __repr__(self):
         return repr((self.path_h5, self.tstart, self.source_name))
 
@@ -73,19 +77,25 @@ def plot_event_pipeline(event_csv_string, fils_list_string, user_validation=Fals
     ...                                         user_validation=False, offset=0)
 
     """
-    #reading in the .csv containing the events
+    # reading in the .csv containing the events
     try:
-        candidate_event_dataframe = pandas.read_csv(event_csv_string, comment='#')
+        candidate_event_dataframe = pandas.read_csv(
+            event_csv_string, comment='#')
         print("plot_event_pipeline: Opened file {}".format(event_csv_string))
     except:
-        print("*** plot_event_pipeline: Oops, cannot access file {}".format(event_csv_string))
+        print(
+            "*** plot_event_pipeline: Oops, cannot access file {}".format(event_csv_string))
         return
+
+    # Convert pandas dataframe to spark dataframe
+    spark_candidate_event_dataframe = spark.createDataFrame(
+        candidate_event_dataframe)
 
     fil_file_list = []
     for file in pandas.read_csv(fils_list_string, encoding='utf-8', header=None, chunksize=1):
-        fil_file_list.append(file.iloc[0,0])
+        fil_file_list.append(file.iloc[0, 0])
 
-    #obtaining source names
+    # obtaining source names
     source_name_list = []
     path_record = []
     for fil in fil_file_list:
@@ -108,15 +118,15 @@ def plot_event_pipeline(event_csv_string, fils_list_string, user_validation=Fals
             print("plot_event_pipeline: file = {}, tstart = {}, source_name = {}"
                   .format(os.path.basename(obj.path_h5), obj.tstart, obj.source_name))
 
-    #get rid of bytestring "B'"s if they're there (early versions of
-    #seti_event.py added "B'"s to all of the source names)
-    on_source_name_original = candidate_event_dataframe.Source[0]
+    # get rid of bytestring "B'"s if they're there (early versions of
+    # seti_event.py added "B'"s to all of the source names)
+    on_source_name_original = spark_candidate_event_dataframe.Source[0]
     if on_source_name_original[0] == 'B' and on_source_name_original[-1] == '\'':
         on_source_name = on_source_name_original[2:-2]
     else:
         on_source_name = on_source_name_original
-    candidate_event_dataframe = candidate_event_dataframe.replace(to_replace=on_source_name_original,
-                                           value=on_source_name)
+    spark_candidate_event_dataframe = spark_candidate_event_dataframe.replace(to_replace=on_source_name_original,
+                                                                              value=on_source_name)
 
     # Establish filter-level from filter_spec (preferred)
     # or 3rd token of the .csv path (don't break an existing caller)
@@ -125,10 +135,12 @@ def plot_event_pipeline(event_csv_string, fils_list_string, user_validation=Fals
     else:
         filter_level = filter_spec
 
-    #begin user validation
+    # begin user validation
     print("Plotting some events for: ", on_source_name)
-    print("There are " + str(len(candidate_event_dataframe.Source)) + " total events in the csv file " + event_csv_string)
-    print("therefore, you are about to make " + str(len(candidate_event_dataframe.Source)) + " .png files.")
+    print("There are " + str(len(spark_candidate_event_dataframe.Source)) +
+          " total events in the csv file " + event_csv_string)
+    print("therefore, you are about to make " +
+          str(len(spark_candidate_event_dataframe.Source)) + " .png files.")
 
     if user_validation:
         question = "Do you wish to proceed with these settings?"
@@ -141,10 +153,10 @@ def plot_event_pipeline(event_csv_string, fils_list_string, user_validation=Fals
             if reply[0] == 'n':
                 return
 
-    #move to plot_event.py for the actual plotting
-    plot_event.plot_candidate_events(candidate_event_dataframe,
-                                   fil_file_list,
-                                   filter_level,
-                                   source_name_list,
-                                   offset=offset,
-                                   plot_dir=plot_dir)
+    # move to plot_event.py for the actual plotting
+    plot_event.plot_candidate_events(spark_candidate_event_dataframe,
+                                     fil_file_list,
+                                     filter_level,
+                                     source_name_list,
+                                     offset=offset,
+                                     plot_dir=plot_dir)
