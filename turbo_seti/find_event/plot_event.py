@@ -7,6 +7,12 @@ ON-OFF radio SETI observations. The main function contained in this file is
 in this file (described below) to plot events from a turboSETI event .csv file.
 '''
 
+from blimpy.utils import rebin
+import blimpy as bl
+from astropy.time import Time
+import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib
 from os import mkdir
 from os.path import dirname, abspath, isdir
 import time
@@ -16,22 +22,16 @@ logger_plot_event = logging.getLogger(logger_plot_event_name)
 logger_plot_event.setLevel(logging.INFO)
 
 # Plotting packages import
-import matplotlib
-import matplotlib.pyplot as plt
 matplotlib.use('agg')
 
 # Math/Science package imports
-import numpy as np
-from astropy.time import Time
 
 # BL imports
-import blimpy as bl
-from blimpy.utils import rebin
 
 # preliminary plot arguments
-fontsize=16
-font = {'family' : 'DejaVu Sans',
-'size' : fontsize}
+fontsize = 16
+font = {'family': 'DejaVu Sans',
+        'size': fontsize}
 MAX_IMSHOW_POINTS = (4096, 1268)
 
 
@@ -97,19 +97,21 @@ def plot_waterfall(wf, source_name, f_start=None, f_stop=None, **kwargs):
         if plot_data.shape[0] > MAX_IMSHOW_POINTS[0]:
             dec_fac_x = plot_data.shape[0] / MAX_IMSHOW_POINTS[0]
         if plot_data.shape[1] > MAX_IMSHOW_POINTS[1]:
-            dec_fac_y =  int(np.ceil(plot_data.shape[1] /  MAX_IMSHOW_POINTS[1]))
+            dec_fac_y = int(np.ceil(plot_data.shape[1] / MAX_IMSHOW_POINTS[1]))
         plot_data = rebin(plot_data, dec_fac_x, dec_fac_y)
     except Exception as ex:
         print('\n*** Oops, grab_data returned plot_data.shape={}, plot_f.shape={}'
               .format(plot_data.shape, plot_f.shape))
         print('Waterfall info for {}:'.format(wf.filename))
         wf.info()
-        raise ValueError('*** Something is wrong with the grab_data output!') from ex
+        raise ValueError(
+            '*** Something is wrong with the grab_data output!') from ex
 
     # Rolled back PR #82
 
     # determine extent of the plotting panel for imshow
-    extent=(plot_f[0], plot_f[-1], (wf.timestamps[-1]-wf.timestamps[0])*24.*60.*60, 0.0)
+    extent = (plot_f[0], plot_f[-1],
+              (wf.timestamps[-1]-wf.timestamps[0])*24.*60.*60, 0.0)
 
     # plot and scale intensity (log vs. linear)
     kwargs['cmap'] = kwargs.get('cmap', 'viridis')
@@ -122,20 +124,21 @@ def plot_waterfall(wf, source_name, f_start=None, f_stop=None, **kwargs):
 
     # display the waterfall plot
     this_plot = plt.imshow(normalized_plot_data,
-        aspect='auto',
-        rasterized=True,
-        interpolation='nearest',
-        extent=extent,
-        **kwargs
-    )
+                           aspect='auto',
+                           rasterized=True,
+                           interpolation='nearest',
+                           extent=extent,
+                           **kwargs
+                           )
 
     # add plot labels
-    plt.xlabel("Frequency [Hz]",fontdict=font)
-    plt.ylabel("Time [s]",fontdict=font)
+    plt.xlabel("Frequency [Hz]", fontdict=font)
+    plt.ylabel("Time [s]", fontdict=font)
 
     # add source name
     ax = plt.gca()
-    plt.text(0.03, 0.8, source_name, transform=ax.transAxes, bbox=dict(facecolor='white'))
+    plt.text(0.03, 0.8, source_name, transform=ax.transAxes,
+             bbox=dict(facecolor='white'))
     # if plot_snr != False:
     #     plt.text(0.03, 0.6, plot_snr, transform=ax.transAxes, bbox=dict(facecolor='white'))
     # return plot
@@ -184,7 +187,8 @@ def make_waterfall_plots(fil_file_list, on_source_name, f_start, f_stop, drift_r
 
     # set up the sub-plots
     n_plots = len(fil_file_list)
-    fig = plt.subplots(n_plots, sharex=True, sharey=True,figsize=(10, 2*n_plots))
+    fig = plt.subplots(n_plots, sharex=True, sharey=True,
+                       figsize=(10, 2*n_plots))
 
     # get directory path for storing PNG files
     if plot_dir is None:
@@ -193,7 +197,6 @@ def make_waterfall_plots(fil_file_list, on_source_name, f_start, f_stop, drift_r
         if not isdir(plot_dir):
             mkdir(plot_dir)
         dirpath = plot_dir
-
 
     # read in data for the first panel
     wf1 = bl.Waterfall(fil_file_list[0], f_start=f_start, f_stop=f_stop)
@@ -205,7 +208,7 @@ def make_waterfall_plots(fil_file_list, on_source_name, f_start, f_stop, drift_r
     if plot_data1.shape[0] > MAX_IMSHOW_POINTS[0]:
         dec_fac_x = plot_data1.shape[0] / MAX_IMSHOW_POINTS[0]
     if plot_data1.shape[1] > MAX_IMSHOW_POINTS[1]:
-        dec_fac_y =  int(np.ceil(plot_data1.shape[1] /  MAX_IMSHOW_POINTS[1]))
+        dec_fac_y = int(np.ceil(plot_data1.shape[1] / MAX_IMSHOW_POINTS[1]))
     plot_data1 = rebin(plot_data1, dec_fac_x, dec_fac_y)
 
     # define more plot parameters
@@ -216,7 +219,8 @@ def make_waterfall_plots(fil_file_list, on_source_name, f_start, f_stop, drift_r
 
     # Fill in each subplot for the full plot
     for ii, filename in enumerate(fil_file_list):
-        logger_plot_event.debug('make_waterfall_plots: file {} in list: {}'.format(ii, filename))
+        logger_plot_event.debug(
+            'make_waterfall_plots: file {} in list: {}'.format(ii, filename))
         # identify panel
         subplot = plt.subplot(n_plots, 1, ii + 1)
         subplots.append(subplot)
@@ -232,7 +236,8 @@ def make_waterfall_plots(fil_file_list, on_source_name, f_start, f_stop, drift_r
                                    **kwargs)
 
         # calculate parameters for estimated drift line
-        t_elapsed = Time(wf.header['tstart'], format='mjd').unix - Time(t0, format='mjd').unix
+        t_elapsed = Time(
+            wf.header['tstart'], format='mjd').unix - Time(t0, format='mjd').unix
         t_duration = (wf.n_ints_in_file - 1) * wf.header['tsamp']
         f_event = f_mid + drift_rate / 1e6 * t_elapsed
 
@@ -241,38 +246,43 @@ def make_waterfall_plots(fil_file_list, on_source_name, f_start, f_stop, drift_r
 
         # Title the full plot
         if ii == 0:
-            plot_title = "%s \n $\\dot{\\nu}$ = %2.3f Hz/s, MJD:%5.5f" % (on_source_name, drift_rate, t0)
+            plot_title = "%s \n $\\dot{\\nu}$ = %2.3f Hz/s, MJD:%5.5f" % (
+                on_source_name, drift_rate, t0)
             plt.title(plot_title)
         # Format full plot
         if ii < len(fil_file_list)-1:
-            plt.xticks(np.linspace(f_start, f_stop, num=4), ['','','',''])
-
+            plt.xticks(np.linspace(f_start, f_stop, num=4), ['', '', '', ''])
 
     # More overall plot formatting, axis labelling
     factor = 1e6
     units = 'Hz'
 
-    #ax = plt.gca()
-    #ax.get_xaxis().get_major_formatter().set_useOffset(False)
+    # ax = plt.gca()
+    # ax.get_xaxis().get_major_formatter().set_useOffset(False)
     xloc = np.linspace(f_start, f_stop, 5)
     xticks = [round(loc_freq) for loc_freq in (xloc - mid_f)*factor]
     if np.max(xticks) > 1000:
         xticks = [xt/1000 for xt in xticks]
         units = 'kHz'
     plt.xticks(xloc, xticks)
-    plt.xlabel("Relative Frequency [%s] from %f MHz"%(units,mid_f),fontdict=font)
+    plt.xlabel("Relative Frequency [%s] from %f MHz" %
+               (units, mid_f), fontdict=font)
 
     # Add colorbar
     cax = fig[0].add_axes([0.94, 0.11, 0.03, 0.77])
-    fig[0].colorbar(this_plot,cax=cax,label='Normalized Power (Arbitrary Units)')
+    fig[0].colorbar(this_plot, cax=cax,
+                    label='Normalized Power (Arbitrary Units)')
 
     # Adjust plots
-    plt.subplots_adjust(hspace=0,wspace=0)
+    plt.subplots_adjust(hspace=0, wspace=0)
 
     # save the figures
-    path_png = dirpath + str(filter_level) + '_' + on_source_name + '_dr_' + "{:0.2f}".format(drift_rate) + '_freq_' "{:0.6f}".format(f_start) + ".png"
+    path_png = dirpath + str(filter_level) + '_' + on_source_name + '_dr_' + \
+        "{:0.2f}".format(drift_rate) + \
+        '_freq_' "{:0.6f}".format(f_start) + ".png"
     plt.savefig(path_png, bbox_inches='tight')
-    logger_plot_event.debug('make_waterfall_plots: Saved file {}'.format(path_png))
+    logger_plot_event.debug(
+        'make_waterfall_plots: Saved file {}'.format(path_png))
 
     # show figure before closing if this is an interactive context
     mplbe = matplotlib.get_backend()
@@ -348,16 +358,20 @@ def plot_candidate_events(candidate_event_dataframe, fil_file_list, filter_level
 
     # load in the data for each individual hit
     if candidate_event_dataframe is None:
-        print('*** plot_candidate_events: candidate_event_dataframe is None, nothing to do.')
+        print(
+            '*** plot_candidate_events: candidate_event_dataframe is None, nothing to do.')
         return
-    len_df = len(candidate_event_dataframe)
+    #! Len doesn't work on a pyspark dataframe
+    len_df = candidate_event_dataframe.count()
     if len_df < 1:
-        print('*** plot_candidate_events: len(candidate_event_dataframe) = 0, nothing to do.')
+        print(
+            '*** plot_candidate_events: len(candidate_event_dataframe) = 0, nothing to do.')
         return
 
     time1 = time.time()
     for i in range(0, len_df):
-        candidate = candidate_event_dataframe.iloc[i]
+        candidate = candidate_event_dataframe.limit(
+            i+1).limit(1).select("*").collect()[0]
         on_source_name = candidate['Source']
         f_mid = candidate['Freq']
         drift_rate = candidate['DriftRate']
@@ -367,24 +381,33 @@ def plot_candidate_events(candidate_event_dataframe, fil_file_list, filter_level
         tfirst = first_fil.header['tstart']
         last_fil = bl.Waterfall(fil_file_list[-1], load_data=False)
         tlast = last_fil.header['tstart']
-        t_elapsed = Time(tlast, format='mjd').unix - Time(tfirst, format='mjd').unix + (last_fil.n_ints_in_file -1) * last_fil.header['tsamp']
+        t_elapsed = Time(tlast, format='mjd').unix - Time(tfirst, format='mjd').unix + \
+            (last_fil.n_ints_in_file - 1) * last_fil.header['tsamp']
 
         # calculate the width of the plot based on making sure the full drift is visible
         bandwidth = 2.4 * abs(drift_rate)/1e6 * t_elapsed
         bandwidth = np.max((bandwidth, 500./1e6))
 
         # Get start and stop frequencies based on midpoint and bandwidth
-        f_start, f_stop = np.sort((f_mid - (bandwidth/2),  f_mid + (bandwidth/2)))
+        f_start, f_stop = np.sort(
+            (f_mid - (bandwidth/2),  f_mid + (bandwidth/2)))
 
         # logger_plot_event.debug useful values
-        logger_plot_event.debug('*************************************************')
-        logger_plot_event.debug('***     The Parameters for This Plot Are:    ****')
+        logger_plot_event.debug(
+            '*************************************************')
+        logger_plot_event.debug(
+            '***     The Parameters for This Plot Are:    ****')
         logger_plot_event.debug('Target = {}'.format(on_source_name))
-        logger_plot_event.debug('Bandwidth = {} MHz'.format(round(bandwidth, 5)))
-        logger_plot_event.debug('Time Elapsed (inc. Slew) = {} s'.format(round(t_elapsed)))
-        logger_plot_event.debug('Middle Frequency = {} MHz'.format(round(f_mid, 4)))
-        logger_plot_event.debug('Expected Drift = {} Hz/s'.format(round(drift_rate, 4)))
-        logger_plot_event.debug('*************************************************')
+        logger_plot_event.debug(
+            'Bandwidth = {} MHz'.format(round(bandwidth, 5)))
+        logger_plot_event.debug(
+            'Time Elapsed (inc. Slew) = {} s'.format(round(t_elapsed)))
+        logger_plot_event.debug(
+            'Middle Frequency = {} MHz'.format(round(f_mid, 4)))
+        logger_plot_event.debug(
+            'Expected Drift = {} Hz/s'.format(round(drift_rate, 4)))
+        logger_plot_event.debug(
+            '*************************************************')
 
         # Pass info to make_waterfall_plots() function
         make_waterfall_plots(fil_file_list,
@@ -400,4 +423,5 @@ def plot_candidate_events(candidate_event_dataframe, fil_file_list, filter_level
                              **kwargs)
     time2 = time.time()
     et = time2 - time1
-    logger_plot_event.info(f"plot_candidate_events: elapsed time = {et:.2f} seconds")
+    logger_plot_event.info(
+        f"plot_candidate_events: elapsed time = {et:.2f} seconds")

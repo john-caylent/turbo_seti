@@ -120,13 +120,15 @@ def plot_event_pipeline(event_csv_string, fils_list_string, user_validation=Fals
 
     # get rid of bytestring "B'"s if they're there (early versions of
     # seti_event.py added "B'"s to all of the source names)
-    on_source_name_original = spark_candidate_event_dataframe.Source[0]
-    if on_source_name_original[0] == 'B' and on_source_name_original[-1] == '\'':
-        on_source_name = on_source_name_original[2:-2]
-    else:
-        on_source_name = on_source_name_original
-    spark_candidate_event_dataframe = spark_candidate_event_dataframe.replace(to_replace=on_source_name_original,
-                                                                              value=on_source_name)
+    # on_source_name_original = spark_candidate_event_dataframe.Source[0]
+    # if on_source_name_original[0] == 'B' and on_source_name_original[-1] == '\'':
+    #     on_source_name = on_source_name_original[2:-2]
+    # else:
+    #     on_source_name = on_source_name_original
+    # spark_candidate_event_dataframe = spark_candidate_event_dataframe.replace(to_replace=on_source_name_original,
+    #                                                                           value=on_source_name)
+
+    on_source_name = spark_candidate_event_dataframe.Source[0]
 
     # Establish filter-level from filter_spec (preferred)
     # or 3rd token of the .csv path (don't break an existing caller)
@@ -136,11 +138,11 @@ def plot_event_pipeline(event_csv_string, fils_list_string, user_validation=Fals
         filter_level = filter_spec
 
     # begin user validation
-    print("Plotting some events for: ", on_source_name)
-    print("There are " + str(len(spark_candidate_event_dataframe.Source)) +
-          " total events in the csv file " + event_csv_string)
-    print("therefore, you are about to make " +
-          str(len(spark_candidate_event_dataframe.Source)) + " .png files.")
+    # print("Plotting some events for: ", on_source_name)
+    # print("There are " + str(len(spark_candidate_event_dataframe.Source)) +
+    #       " total events in the csv file " + event_csv_string)
+    # print("therefore, you are about to make " +
+    #       str(len(spark_candidate_event_dataframe.Source)) + " .png files.")
 
     if user_validation:
         question = "Do you wish to proceed with these settings?"
