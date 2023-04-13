@@ -1,0 +1,39 @@
+{
+  "name": "spark-python-in-image", 
+  "virtualClusterId": "fahli0pb3tz2dkgpqm7y3trr1", 
+  "executionRoleArn": "arn:aws:iam::479305653407:role/terraform-aws-caylenttwo-emr-eks-data-team-b", 
+  "releaseLabel": "emr-6.9.0-latest", 
+  "jobDriver": {
+    "sparkSubmitJobDriver": {
+      "entryPoint": "s3://sandbox-terraform-aws-caylenttwo-emr/scripts/seti_example-2.py",
+      "entryPointArguments": ["https://slowikshare.s3.amazonaws.com/single_coarse_guppi_59046_80036_DIAG_VOYAGER-1_0011.rawspec.0000.h5","sandbox-terraform-aws-caylenttwo-emr","spark_output_fsx"],
+       "sparkSubmitParameters": "--conf spark.executor.instances=1 --conf spark.executor.memory=2G --conf spark.driver.memory=2G --conf spark.executor.cores=2 --conf spark.driver.cores=1"
+    }
+  }, 
+  "configurationOverrides": {
+    "applicationConfiguration": [
+      {
+        "classification": "spark-defaults", 
+        "properties": {
+          "spark.kubernetes.container.image": "479305653407.dkr.ecr.us-east-1.amazonaws.com/seti-vcluster-poc:emr-6.9-fsx",
+          "spark.kubernetes.driver.volumes.persistentVolumeClaim.spark-local-dir-examplebackend.options.claimName":"spark-local-dir-examplebackend",
+          "spark.kubernetes.driver.volumes.persistentVolumeClaim.spark-local-dir-examplebackend.mount.path":"/data",
+          "spark.kubernetes.driver.volumes.persistentVolumeClaim.spark-local-dir-examplebackend.mount.readOnly":"false",
+          "spark.kubernetes.executor.volumes.persistentVolumeClaim.spark-local-dir-examplebackend.options.claimName":"spark-local-dir-examplebackend",
+          "spark.kubernetes.executor.volumes.persistentVolumeClaim.spark-local-dir-examplebackend.mount.path":"/data",
+          "spark.kubernetes.executor.volumes.persistentVolumeClaim.spark-local-dir-examplebackend.mount.readOnly":"false",
+          "spark.kubernetes.file.upload.path": "/data"
+        }
+      }
+    ], 
+    "monitoringConfiguration": {
+      "cloudWatchMonitoringConfiguration": {
+        "logGroupName": "/aws/eks/terraform-aws-caylenttwo/emr-vcluster",
+        "logStreamNamePrefix": "emr-data-team-b"
+        }, 
+      "s3MonitoringConfiguration": {
+        "logUri": "s3://sandbox-terraform-aws-caylenttwo-emr"
+      }
+    }
+  }
+}
