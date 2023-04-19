@@ -9,7 +9,13 @@ find_events from find_events.py to read a list of turboSETI .dat files.
 It then finds events within this group of files.
 """
 
-#required packages and programs
+# required packages and programs
+from pyspark.sql import SparkSession
+from turbo_seti.find_event.find_event import find_events
+from blimpy.utils import change_the_ext
+from blimpy import Waterfall
+import numpy as np
+import pandas as pd
 import os
 from operator import attrgetter
 
@@ -18,18 +24,16 @@ logger_name = 'find_event_pipeline'
 logger = logging.getLogger(logger_name)
 logger.setLevel(logging.INFO)
 
-import pandas as pd
-import numpy as np
-from blimpy import Waterfall
-from blimpy.utils import change_the_ext
-from turbo_seti.find_event.find_event import find_events
+
+spark = SparkSession.builder.appName("plot_event").getOrCreate()
 
 
-RTOL_DIFF = 0.01 # 1%
+RTOL_DIFF = 0.01  # 1%
 
 
 class PathRecord:
     r''' Definition of a DAT record '''
+
     def __init__(self, path_dat, tstart, source_name, fch1, foff, nchans):
         self.path_dat = path_dat
         self.tstart = tstart
@@ -37,6 +41,7 @@ class PathRecord:
         self.fch1 = fch1
         self.foff = foff
         self.nchans = nchans
+
     def __repr__(self):
         return repr((self.path_dat, self.tstart, self.source_name))
 
@@ -68,7 +73,7 @@ def close_enough(x, y):
     return False
 
 
-def find_event_pipeline(dat_file_list_str,h5_file_list_str=None, check_zero_drift=False, filter_threshold=3,
+def find_event_pipeline(dat_file_list_str, h5_file_list_str=None, check_zero_drift=False, filter_threshold=3,
                         on_off_first='ON', number_in_cadence=6, on_source_complex_cadence=False,
                         saving=True, csv_name=None, user_validation=False,
                         sortby_tstart=True,
@@ -194,7 +199,7 @@ def find_event_pipeline(dat_file_list_str,h5_file_list_str=None, check_zero_drif
     if on_source_complex_cadence:
         print("Assuming a complex cadence for the following on source: {}"
               .format(on_source_complex_cadence))
-    else: # not on_source_complex_cadence:
+    else:  # not on_source_complex_cadence:
         print("Assuming the first observation is an " + on_off_first)
         complex_cadence = on_source_complex_cadence
 
@@ -206,8 +211,8 @@ def find_event_pipeline(dat_file_list_str,h5_file_list_str=None, check_zero_drif
     # Get a list of the DAT/h5 files.
     def list_of_files(dat_file_list_str):
         dat_file_list = open(dat_file_list_str).readlines()
-        dat_file_list = [files.replace('\n','') for files in dat_file_list]
-        dat_file_list = [files.replace(',','') for files in dat_file_list]
+        dat_file_list = [files.replace('\n', '') for files in dat_file_list]
+        dat_file_list = [files.replace(',', '') for files in dat_file_list]
         n_files = len(dat_file_list)
         return n_files, dat_file_list
     n_files, dat_file_list = list_of_files(dat_file_list_str)
@@ -218,21 +223,19 @@ def find_event_pipeline(dat_file_list_str,h5_file_list_str=None, check_zero_drif
             source_name = header["source_name"]
             tstart = header["tstart"]
             path_record.append(PathRecord(hf, tstart, source_name, header["fch1"],
-                                        header["foff"], header["nchans"]))
+                                          header["foff"], header["nchans"]))
             source_name_list.append(source_name)
     else:
         _, h5_file_list = list_of_files(h5_file_list_str)
         for hf in h5_file_list:
             header = get_file_header(hf)
-            for dat in dat_file_list: # O(n^2) TODO: create tests in pytest
-                if os.path.basename(dat).replace('.dat','.h5')==os.path.basename(hf):
+            for dat in dat_file_list:  # O(n^2) TODO: create tests in pytest
+                if os.path.basename(dat).replace('.dat', '.h5') == os.path.basename(hf):
                     source_name = header["source_name"]
                     tstart = header["tstart"]
                     path_record.append(PathRecord(dat, tstart, source_name, header["fch1"],
-                                            header["foff"], header["nchans"]))
+                                                  header["foff"], header["nchans"]))
                     source_name_list.append(source_name)
-
-
 
     # If sorting by header.tstart, then rewrite the dat_file_list in header.tstart order.
     if sortby_tstart:
@@ -246,19 +249,21 @@ def find_event_pipeline(dat_file_list_str,h5_file_list_str=None, check_zero_drif
     # Otherwise, just use the first record.
     if on_source_complex_cadence:
         flag_terminate = True
-        for obj in path_record: # Look for 1st occurence of source_name.
+        for obj in path_record:  # Look for 1st occurence of source_name.
             if obj.source_name == on_source_complex_cadence:
                 matcher = obj
                 flag_terminate = False
                 break
         if flag_terminate:
-            logger.error(f"Source '{on_source_complex_cadence}' is not in this complex cadence!")
+            logger.error(
+                f"Source '{on_source_complex_cadence}' is not in this complex cadence!")
             for obj in path_record:
                 logger.info("file={}, tstart={}, source_name={}, fch1={}, foff={}, nchans={}"
                             .format(os.path.basename(obj.path_dat), obj.tstart, obj.source_name,
                                     obj.fch1, obj.foff, obj.nchans))
             return None
-        logger.info(f"Source '{on_source_complex_cadence}' is in this complex cadence.")
+        logger.info(
+            f"Source '{on_source_complex_cadence}' is in this complex cadence.")
     else:
         matcher = path_record[0]
 
@@ -268,21 +273,21 @@ def find_event_pipeline(dat_file_list_str,h5_file_list_str=None, check_zero_drif
         logger.info("file={}, tstart={}, source_name={}, fch1={}, foff={}, nchans={}"
                     .format(os.path.basename(obj.path_dat), obj.tstart, obj.source_name,
                             obj.fch1, obj.foff, obj.nchans))
-        if on_source_complex_cadence: # Complex cadence?
+        if on_source_complex_cadence:  # Complex cadence?
             # If not a part of the complex cadence, then skip it.
             if on_source_complex_cadence != obj.source_name:
                 continue
         # Part of the cadence, complex or not.
         # Make sure that the frequency range makes sense.
-        ###print(f"DEBUG fch1 {obj.fch1}:{matcher.fch1}   foff {obj.foff}:{matcher.foff}   nchans {obj.nchans}:{matcher.nchans}")
+        # print(f"DEBUG fch1 {obj.fch1}:{matcher.fch1}   foff {obj.foff}:{matcher.foff}   nchans {obj.nchans}:{matcher.nchans}")
         if not close_enough(obj.fch1, matcher.fch1) \
-        or not close_enough(obj.foff, matcher.foff) \
-        or obj.nchans != matcher.nchans:
-            logger.error("Inconsistent frequency range!  This does not look like a cadence of related files.")
+                or not close_enough(obj.foff, matcher.foff) \
+                or obj.nchans != matcher.nchans:
+            logger.error(
+                "Inconsistent frequency range!  This does not look like a cadence of related files.")
             flag_terminate = True
     if flag_terminate:
         return None
-
 
     # If this is a complex cadence,
     # * construct a complex_cadence list of 1s and 0s.
@@ -300,13 +305,15 @@ def find_event_pipeline(dat_file_list_str,h5_file_list_str=None, check_zero_drif
         if count_cadence > 0:
             print("The derived complex cadence is: " + str(complex_cadence))
         else:
-            logger.error(f"Sorry, no potential candidates with your given on_source_complex_cadence={on_source_complex_cadence}  :(")
+            logger.error(
+                f"Sorry, no potential candidates with your given on_source_complex_cadence={on_source_complex_cadence}  :(")
             return None
 
     num_of_sets = int(n_files / number_in_cadence)
     print("There are " + str(len(dat_file_list)) + " total files in the filelist "
           + dat_file_list_str)
-    print("Therefore, looking for events in " + str(num_of_sets) + " on-off set(s)")
+    print("Therefore, looking for events in " +
+          str(num_of_sets) + " on-off set(s)")
 
     if filter_threshold == 1:
         print("Present in an ON source only")
@@ -331,18 +338,18 @@ def find_event_pipeline(dat_file_list_str,h5_file_list_str=None, check_zero_drif
             if reply[0] == 'n':
                 return None
 
-    #Looping over number_in_cadence chunks.
+    # Looping over number_in_cadence chunks.
     candidate_list = []
     for ii in range(num_of_sets):
         sublist_low = number_in_cadence * ii
         sublist_high = sublist_low + number_in_cadence
-        file_sublist = dat_file_list[sublist_low : sublist_high]
+        file_sublist = dat_file_list[sublist_low: sublist_high]
         if not complex_cadence:
             if on_off_first == 'ON':
                 filename = os.path.basename(file_sublist[0])
-            else: # on_off_first == 'OFF'
+            else:  # on_off_first == 'OFF'
                 filename = os.path.basename(file_sublist[1])
-        else: # complex_cadence
+        else:  # complex_cadence
             filename = os.path.basename(file_sublist[complex_cadence.index(1)])
 
         print("=== First DAT file in set:  " + filename + " ===")
@@ -361,15 +368,20 @@ def find_event_pipeline(dat_file_list_str,h5_file_list_str=None, check_zero_drif
             candidate_list.append(cand)
     if len(candidate_list) > 0:
         find_event_output_dataframe = pd.concat(candidate_list)
+        # Convert to pyspark dataframe
+        spark_find_event_output_dataframe = spark.createDataFrame(
+            find_event_output_dataframe)
     else:
-        logger.error("Sorry, no potential candidates with your given parameters :(")
+        logger.error(
+            "Sorry, no potential candidates with your given parameters :(")
         return None
 
     print("===========   find_event_pipeline: output dataframe is complete   ===========")
 
     if saving:
         if csv_name is None:
-            prefix = os.path.dirname(dat_file_list[0]) + '/' + source_name_list[0]
+            prefix = os.path.dirname(
+                dat_file_list[0]) + '/' + source_name_list[0]
             if check_zero_drift:
                 filestring = prefix + '_f' + str(filter_threshold) + '_snr' \
                     + str(SNR_cut) + '_zero' + '.csv'
@@ -378,11 +390,11 @@ def find_event_pipeline(dat_file_list_str,h5_file_list_str=None, check_zero_drif
                     + str(SNR_cut) + '.csv'
         else:
             filestring = csv_name
-        if not isinstance(find_event_output_dataframe, list):
-            find_event_output_dataframe.to_csv(filestring)
+        if not isinstance(spark_find_event_output_dataframe, list):
+            spark_find_event_output_dataframe.to_csv(filestring)
             print("find_event_pipeline: Saved CSV file to {}".format(filestring))
         else:
             logger.error("Sorry, no events to save :(")
             return None
 
-    return find_event_output_dataframe
+    return spark_find_event_output_dataframe

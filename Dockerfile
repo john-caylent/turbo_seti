@@ -1,9 +1,8 @@
-FROM jupyter/pyspark-notebook
+FROM jupyter/pyspark-notebook:2023-04-03
 
 ARG DEBIAN_FRONTEND=noninteractive
 USER root
 RUN apt-get update -y
-RUN apt-get autoclean
 
 COPY . /turboseti
 WORKDIR /turboseti
@@ -19,13 +18,13 @@ RUN apt-get install -y wget
 RUN apt-get install -y curl
 RUN apt-get install -y git
 
-RUN python3 -m pip install -U pip
+RUN python3 -m pip install pip
 RUN python3 -m pip install git+https://github.com/john-caylent/blimpy
+#RUN python3 -m pip install git+https://github.com/john-caylent/turbo_seti@spark
 RUN python3 -m pip install -r requirements.txt
-RUN python3 -m pip install -r requirements_test.txt
+#RUN python3 -m pip install -r requirements_test.txt
 RUN python3 setup.py install
 #RUN cd test && python3 download_test_data.py && cd ..
 # RUN cd test && bash run_tests.sh && cd ..
 
-RUN pip install pandas
 WORKDIR /home

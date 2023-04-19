@@ -120,6 +120,7 @@ def plot_event_pipeline(event_csv_string, fils_list_string, user_validation=Fals
 
     # get rid of bytestring "B'"s if they're there (early versions of
     # seti_event.py added "B'"s to all of the source names)
+    #! For our purposes this won't be necessary as we're not using old data
     # on_source_name_original = spark_candidate_event_dataframe.Source[0]
     # if on_source_name_original[0] == 'B' and on_source_name_original[-1] == '\'':
     #     on_source_name = on_source_name_original[2:-2]
