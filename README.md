@@ -27,6 +27,24 @@ It was originally based on `dedoppler` [dedoppler](http://github.com/cs150bf/gbt
 
 -------------------
 
+&nbsp;
+
+### Caylent Notes:
+
+To get started:
+
+`docker build -t seti-pyspark .`
+`docker run -it -p 8888:8888 -p 4040:4040 --name setipysparkcontainer seti-pyspark`
+Open a web browser and navigate to `http://localhost:8888` to access Jupyter Notebook running in the container.
+Enter the token provided in the terminal output.
+CD to ~
+Run `wget https://slowikshare.s3.amazonaws.com/single_coarse_guppi_59046_80036_DIAG_VOYAGER-1_0011.rawspec.0000.h5`
+Run `turboSETI single_coarse_guppi_59046_80036_DIAG_VOYAGER-1_0011.rawspec.0000.h5 -g n -S n -P n`
+Make "plots" directory `mkdir plots`
+Run `plotSETI ./ --out_dir ./plots`
+
+-------------------
+
 ### Dependencies
 
 - Python 3.7+
