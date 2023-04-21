@@ -43,7 +43,7 @@ Enter the token provided in the terminal output.
 
 CD to ~
 
-Run `wget https://slowikshare.s3.amazonaws.com/single_coarse_guppi_59046_80036_DIAG_VOYAGER-1_0011.rawspec.0000.h5`
+Run `curl -O https://slowikshare.s3.amazonaws.com/single_coarse_guppi_59046_80036_DIAG_VOYAGER-1_0011.rawspec.0000.h5`
 
 Run `turboSETI single_coarse_guppi_59046_80036_DIAG_VOYAGER-1_0011.rawspec.0000.h5 -g n -S n -P n`
 
