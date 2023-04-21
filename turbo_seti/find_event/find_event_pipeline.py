@@ -26,6 +26,7 @@ logger.setLevel(logging.INFO)
 
 
 spark = SparkSession.builder.appName("plot_event").getOrCreate()
+spark.conf.set("spark.sql.execution.arrow.pyspark.enabled", "true")
 
 
 RTOL_DIFF = 0.01  # 1%
@@ -391,7 +392,25 @@ def find_event_pipeline(dat_file_list_str, h5_file_list_str=None, check_zero_dri
         else:
             filestring = csv_name
         if not isinstance(spark_find_event_output_dataframe, list):
-            spark_find_event_output_dataframe.to_csv(filestring)
+            ## Convert back to pandas dataframe to be able to call to_csv ##
+            pandas_df = spark_find_event_output_dataframe.toPandas()
+            pandas_df.to_csv(filestring)
+
+            # spark_find_event_output_dataframe.write.format("csv").option("header", "true").mode(
+            #     "overwrite").option("path", "/init").save()
+
+            # # Get list of CSV files in output directory
+            # csv_files = glob.glob("/init")
+            # df = None
+            # for csv_file in csv_files:
+            #     if df is None:
+            #         df = spark.read.csv(csv_file, header=True)
+            #     else:
+            #         df = df.union(spark.read.csv(csv_file, header=True))
+
+            # # write the combined DataFrame to a single CSV file
+            # df.write.csv(filestring, header=True)
+
             print("find_event_pipeline: Saved CSV file to {}".format(filestring))
         else:
             logger.error("Sorry, no events to save :(")
