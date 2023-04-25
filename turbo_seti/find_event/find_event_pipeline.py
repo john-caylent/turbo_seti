@@ -368,10 +368,10 @@ def find_event_pipeline(dat_file_list_str, h5_file_list_str=None, check_zero_dri
         if cand_len != 0:
             candidate_list.append(cand)
     if len(candidate_list) > 0:
-        find_event_output_dataframe = pd.concat(candidate_list)
+        # find_event_output_dataframe = pd.concat(candidate_list)
         # Convert to pyspark dataframe
         spark_find_event_output_dataframe = spark.createDataFrame(
-            find_event_output_dataframe)
+            pd.concat(candidate_list))
     else:
         logger.error(
             "Sorry, no potential candidates with your given parameters :(")
