@@ -24,10 +24,7 @@ logger_name = 'find_event_pipeline'
 logger = logging.getLogger(logger_name)
 logger.setLevel(logging.INFO)
 
-
-spark = SparkSession.builder.appName("plot_event").getOrCreate()
-spark.conf.set("spark.sql.execution.arrow.pyspark.enabled", "true")
-
+spark: SparkSession
 
 RTOL_DIFF = 0.01  # 1%
 
@@ -78,7 +75,7 @@ def find_event_pipeline(dat_file_list_str, h5_file_list_str=None, check_zero_dri
                         on_off_first='ON', number_in_cadence=6, on_source_complex_cadence=False,
                         saving=True, csv_name=None, user_validation=False,
                         sortby_tstart=True,
-                        SNR_cut=None, min_drift_rate=None, max_drift_rate=None):
+                        SNR_cut=None, min_drift_rate=None, max_drift_rate=None, spark_session: SparkSession = None):
     """
     Find event pipeline.
 
@@ -166,6 +163,8 @@ def find_event_pipeline(dat_file_list_str, h5_file_list_str=None, check_zero_dri
         files are accepted as-is.
         Otherwise, the specified value is the threshold drift rate above which
         hits will be discarded.
+    spark_session: None (default value) or SparkSession
+        If None, then the code will not use Spark. And since I'm lazy it'll fail. So don't do that.
 
     Returns
     -------
@@ -196,6 +195,8 @@ def find_event_pipeline(dat_file_list_str, h5_file_list_str=None, check_zero_dri
     print()
     print("===========   BEGINNING FIND_EVENT PIPELINE   ===========")
     print()
+
+    spark = spark_session
 
     if on_source_complex_cadence:
         print("Assuming a complex cadence for the following on source: {}"
@@ -361,7 +362,8 @@ def find_event_pipeline(dat_file_list_str, h5_file_list_str=None, check_zero_dri
                            check_zero_drift=check_zero_drift,
                            filter_threshold=filter_threshold,
                            on_off_first=on_off_first,
-                           complex_cadence=complex_cadence)
+                           complex_cadence=complex_cadence,
+                           spark_session=spark)
         cand_len = 1
         if cand is None:
             cand_len = 0

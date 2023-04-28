@@ -1,8 +1,9 @@
-FROM jupyter/pyspark-notebook:2023-04-03
+FROM jupyter/pyspark-notebook
 
 ARG DEBIAN_FRONTEND=noninteractive
 USER root
 RUN apt-get update -y
+RUN apt-get upgrade -y
 
 COPY . /turboseti
 WORKDIR /turboseti

@@ -10,6 +10,7 @@ import os
 import glob
 from argparse import ArgumentParser, RawDescriptionHelpFormatter
 import matplotlib
+from pyspark.sql import SparkSession
 
 from blimpy import __version__ as BLIMPY_VERSION
 from turbo_seti.find_event.find_event_pipeline import find_event_pipeline
@@ -221,6 +222,8 @@ def main(args=None):
     parser.add_argument("--debug", default=False, action="store_true",
                         help="Turn on debug tracing (developer).")
 
+    spark = SparkSession.builder.appName("plot_event").getOrCreate()
+
     if args is None:
         args = parser.parse_args()
     else:
@@ -243,10 +246,10 @@ def main(args=None):
     if args.dat_dir is None:
         args.dat_dir = args.h5_dir
 
-    return execute_pipelines(args)
+    return execute_pipelines(args, spark)
 
 
-def execute_pipelines(args):
+def execute_pipelines(args, spark):
     """
     Interface to the pipeline functions, called by main().
 
@@ -340,7 +343,8 @@ def execute_pipelines(args):
                                        max_drift_rate=args.max_drift_rate,
                                        user_validation=False,
                                        csv_name=path_csvf,
-                                       saving=True)
+                                       saving=True,
+                                       spark_session=spark)
     else:  # not a complex cadence
         df_check = find_event_pipeline(path_dat_list,
                                        path_h5_list,
@@ -355,7 +359,8 @@ def execute_pipelines(args):
                                        max_drift_rate=args.max_drift_rate,
                                        user_validation=False,
                                        csv_name=path_csvf,
-                                       saving=True)
+                                       saving=True,
+                                       spark_session=spark)
 
     if df_check is None:
         print("\n*** plotSETI: No events produced in find_event_pipeline()!")
@@ -368,7 +373,8 @@ def execute_pipelines(args):
                         plot_dir=out_dir,
                         filter_spec=args.filter_threshold,
                         offset=offset,
-                        user_validation=False)
+                        user_validation=False,
+                        spark_session=spark)
 
     print(f"\nplotSETI: Plots are stored in directory {out_dir}.")
 

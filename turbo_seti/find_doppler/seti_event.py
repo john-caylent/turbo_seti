@@ -15,6 +15,7 @@ from blimpy import __version__ as BLIMPY_VERSION
 from .find_doppler import FindDoppler
 from .kernels import Kernels
 from .turbo_seti_version import TURBO_SETI_VERSION
+from pyspark.sql import SparkSession
 
 
 def main(args=None):
@@ -28,7 +29,7 @@ def main(args=None):
     """
     # Create an option parser to get command-line input/arguments
     p = ArgumentParser(description='turboSETI doppler drift narrowband search utility version {}.'
-                                    .format(TURBO_SETI_VERSION))
+                       .format(TURBO_SETI_VERSION))
 
     p.add_argument('filename', type=str, default='', nargs="?",
                    help='Name of filename to open (h5 or fil)')
@@ -65,6 +66,8 @@ def main(args=None):
     p.add_argument('-a', '--append_output', dest='flag_append_output', type=str, default='n',
                    help='Append output DAT & LOG files? (y/n)')
 
+    spark = SparkSession.builder.appName("seti_event").getOrCreate()
+
     if args is None:
         args = p.parse_args()
     else:
@@ -84,13 +87,15 @@ def main(args=None):
         sys.exit(86)
 
     if args.flag_profile == "y":
-        cProfile.runctx('exec(args)', {'args': args, 'exec': exec_proc}, {}, filename='stats_file.bin')
+        cProfile.runctx('exec(args)', {'args': args, 'exec': exec_proc}, {
+        }, filename='stats_file.bin')
         p = pstats.Stats('stats_file.bin')
         p.strip_dirs().sort_stats('time').print_stats(16)
     else:
-        exec_proc(args)
+        exec_proc(args, spark_session=spark)
 
-def exec_proc(args):
+
+def exec_proc(args, spark_session=None):
     r"""
     Interface to FindDoppler class, called by main().
 
@@ -120,7 +125,7 @@ def exec_proc(args):
     if Kernels.has_gpu() and args.flag_gpu == "n":
         print("Info: Your system is compatible with GPU-mode. Use the `-g y` argument to enable it.")
 
-    #Doing search
+    # Doing search
     t0 = time.time()
 
     find_seti_event = FindDoppler(args.filename,
@@ -128,7 +133,8 @@ def exec_proc(args):
                                   min_drift=args.min_drift,
                                   snr=args.snr,
                                   out_dir=args.out_dir,
-                                  append_output=(args.flag_append_output == "y"),
+                                  append_output=(
+                                      args.flag_append_output == "y"),
                                   coarse_chans=coarse_chans,
                                   obs_info=None,
                                   n_coarse_chan=args.n_coarse_chan,
@@ -136,7 +142,8 @@ def exec_proc(args):
                                   gpu_id=args.gpu_id,
                                   blank_dc=(args.flag_blank_dc == "y"),
                                   precision=1 if args.flag_single_precision == "y" else 2,
-                                  log_level_int=log_level_int)
+                                  log_level_int=log_level_int,
+                                  spark_session=spark_session)
 
     find_seti_event.search(n_partitions=args.n_parallel,
                            progress_bar=args.flag_progress_bar)

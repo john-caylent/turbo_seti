@@ -13,9 +13,22 @@ import time
 import re
 import pandas as pd
 import numpy as np
+from pyspark.sql import SparkSession, DataFrame
+from pyspark.sql.functions import lit
+from functools import reduce
+from pyspark.sql.functions import col
+from pyspark.sql.functions import monotonically_increasing_id
+from pyspark.sql.functions import col, when, unix_timestamp
+from pyspark.sql.functions import col, udf
+from pyspark.sql.types import FloatType, IntegerType
+from pyspark.sql.functions import pandas_udf, PandasUDFType
 
 pd.options.mode.chained_assignment = None
-#^To remove pandas warnings: default='warn'
+# ^To remove pandas warnings: default='warn'
+# spark = SparkSession.builder.appName("plot_event").getOrCreate()
+# spark.conf.set("spark.sql.execution.arrow.pyspark.enabled", "true")
+# spark = SparkSession.getActiveSession()
+spark: SparkSession = SparkSession
 
 
 def end_search(t0):
@@ -28,12 +41,12 @@ def end_search(t0):
     t0 : time
 
     """
-    #Report elapsed search time
+    # Report elapsed search time
     t1 = time.time()
     print('find_events: Elapsed time: %.2f sec' % ((t1-t0)))
 
 
-def read_dat(filename):
+def read_dat(filename, spark: SparkSession):
     r"""
     Read a turboseti .dat file.
 
@@ -64,8 +77,9 @@ def read_dat(filename):
 
     # As of version 2.1.0, there are 2 additional parameters:
     try:
-        max_drift_rate = hits[5].strip().split('\t')[2].split(':')[-1].strip() # Hz/s
-        obs_length = hits[5].strip().split('\t')[3].split(':')[-1].strip() # s
+        max_drift_rate = hits[5].strip().split(
+            '\t')[2].split(':')[-1].strip()  # Hz/s
+        obs_length = hits[5].strip().split('\t')[3].split(':')[-1].strip()  # s
     except Exception as exc:
         msg = '*** Out-of-date DAT file format detected in {}.  Rerun doppler search!' \
               .format(filename)
@@ -127,7 +141,7 @@ def read_dat(filename):
     df_data['in_n_ons'] = ''
     df_data['RFI_in_range'] = ''
 
-    return df_data
+    return spark.createDataFrame(data=df_data)
 
 
 def calc_freq_range(hit, delta_t=0.0, max_dr=True, follow=False):
@@ -149,22 +163,26 @@ def calc_freq_range(hit, delta_t=0.0, max_dr=True, follow=False):
     """
     if max_dr:
         drift_rate = float(hit['max_drift_rate'])
+        # drift_rate = hit.select(col('max_drift_rate')).first()[0]
     else:
         drift_rate = float(hit['DriftRate'])
+        # drift_rate = hit.select(col('DriftRate')).first()[0]
 
     if drift_rate == 0.0:
         drift_rate = float(hit['DELTAF'])/float(hit['DELTAT'])
     if follow:
         freq = float(hit['Freq']) + drift_rate*(delta_t)/1e6
-        delta_t = 2.0 * float(hit['obs_length'])  # NOTE: I'm doing twice the amount in order to widen the range a bit.
+        # NOTE: I'm doing twice the amount in order to widen the range a bit.
+        delta_t = 2.0 * float(hit['obs_length'])
     else:
         freq = float(hit['Freq'])
-        delta_t = delta_t + float(hit['obs_length'])  #adding to the end of the obs.
+        # adding to the end of the obs.
+        delta_t = delta_t + float(hit['obs_length'])
 
-    low_bound  = freq - abs(drift_rate)*delta_t/1e6
+    low_bound = freq - abs(drift_rate)*delta_t/1e6
     high_bound = freq + abs(drift_rate)*delta_t/1e6
 
-    return [low_bound,high_bound]
+    return [low_bound, high_bound]
 
 
 def follow_event(hit, on_table, get_count=True):
@@ -184,19 +202,21 @@ def follow_event(hit, on_table, get_count=True):
 
     """
 
-    #uses calc_freq_range to see how much the hit *should* have drifted by
-    freq_range = calc_freq_range(hit, delta_t=on_table['delta_t'].values[0], max_dr=False, follow=True)
+    # uses calc_freq_range to see how much the hit *should* have drifted by
+    freq_range = calc_freq_range(
+        hit, delta_t=on_table['delta_t'].values[0], max_dr=False, follow=True)
 
-    #looks at the on (next given observation) to see if there are any
-    #hits that could plausibly be related to the first one
-    new_on_table = on_table[(on_table['Freq']>freq_range[0]) & (on_table['Freq']<freq_range[1])]
+    # looks at the on (next given observation) to see if there are any
+    # hits that could plausibly be related to the first one
+    new_on_table = on_table[(on_table['Freq'] > freq_range[0]) & (
+        on_table['Freq'] < freq_range[1])]
 
-    #we only care if there were or were not plausible hits, so turn output into
-    #a binary variable with get_count=True
+    # we only care if there were or were not plausible hits, so turn output into
+    # a binary variable with get_count=True
     if get_count:
         n_hits_in_range = len(new_on_table)
 
-        #Avoiding cases where multiple hits in one obs, and none in the other.
+        # Avoiding cases where multiple hits in one obs, and none in the other.
         if n_hits_in_range:
             return 1
         return 0
@@ -229,10 +249,9 @@ def not_yet_seen(mylist, argument):
     return True
 
 
-
 def find_events(dat_file_list, check_zero_drift=False, filter_threshold=3,
                 on_off_first='ON', complex_cadence=False,
-                SNR_cut=None, min_drift_rate=None, max_drift_rate=None):
+                SNR_cut=None, min_drift_rate=None, max_drift_rate=None, spark_session: SparkSession = None):
     r"""
     Reads a list of turboSETI .dat files.
 
@@ -289,7 +308,7 @@ def find_events(dat_file_list, check_zero_drift=False, filter_threshold=3,
         files are accepted as-is.
         Otherwise, the specified value is the threshold drift rate above which
         hits will be discarded.
- 
+
     Examples
     --------
     It is highly recommended that users interact with this program via the
@@ -313,7 +332,8 @@ def find_events(dat_file_list, check_zero_drift=False, filter_threshold=3,
         3) Hits that are only in all As and no Bs
 
     """
-    #Initializing timer
+    spark = spark_session
+    # Initializing timer
     t0 = time.time()
 
     print(f"find_events: SNR_cut = {SNR_cut}")
@@ -321,7 +341,7 @@ def find_events(dat_file_list, check_zero_drift=False, filter_threshold=3,
     print(f"find_events: max_drift_rate = {max_drift_rate}")
     print("find_events: Loading data...")
 
-    #Preparing to read in the list of files
+    # Preparing to read in the list of files
     on_table_list = []
     off_table_list = []
 
@@ -330,63 +350,83 @@ def find_events(dat_file_list, check_zero_drift=False, filter_threshold=3,
 
     odd_even_indicator = 0
     on_off_indicator = 0
-    if complex_cadence: # One source name was provided.
+    if complex_cadence:  # One source name was provided.
         number_of_ons = 0
-    else: # complex_cadence=False
+    else:  # complex_cadence=False
         number_of_ons = int(np.floor(len(dat_file_list) / 2.0))
         if on_off_first == 'ON':
             odd_even_indicator = 1
             number_of_ons = int(np.ceil(len(dat_file_list) / 2.0))
 
-    #reading in the list of files
+    # reading in the list of files
     for ii, dat_file in enumerate(dat_file_list):
         if complex_cadence:
             on_off_indicator = int(complex_cadence[ii])
             number_of_ons += on_off_indicator
-        #Checking if the file is an on or off observation
-        #if off
-        if (ii%2 == odd_even_indicator and complex_cadence == False) \
-        or (on_off_indicator == 0 and complex_cadence != False):
-            #Using read_dat function to read the .dat file
-            #and create the pandas hit table for OFF sources
-            off_table_ii = read_dat(dat_file)
-            nhits = len(off_table_ii)
-            print('find_events: Loaded %i hits from %s (OFF)'%(nhits, dat_file))
+        # Checking if the file is an on or off observation
+        # if off
+        if (ii % 2 == odd_even_indicator and complex_cadence == False) \
+                or (on_off_indicator == 0 and complex_cadence != False):
+            # Using read_dat function to read the .dat file
+            # and create the pandas hit table for OFF sources
+            off_table_ii = read_dat(dat_file, spark)
+            # nhits = len(off_table_ii)
+            nhits = off_table_ii.count()
+            print('find_events: Loaded %i hits from %s (OFF)' %
+                  (nhits, dat_file))
             if nhits > 0:
                 off_table_ii['status'] = 'off_table_{}'.format(off_count)
-                #Grouping all of the off hits into one table
+                # Grouping all of the off hits into one table
                 off_table_list.append(off_table_ii)
                 off_count += 1
 
         else:
-            #Using read_dat function to read the .dat file
-            #and create the pandas hit table for ON sources
-            on_table_ii = read_dat(dat_file)
-            nhits = len(on_table_ii)
-            print('find_events: Loaded %i hits from %s (ON)'%(nhits, dat_file))
+            # Using read_dat function to read the .dat file
+            # and create the pandas hit table for ON sources
+            on_table_ii = read_dat(dat_file, spark)
+            # nhits = len(on_table_ii)
+            nhits = on_table_ii.count()
+            print('find_events: Loaded %i hits from %s (ON)' %
+                  (nhits, dat_file))
             if nhits > 0:
-                on_table_ii['status'] = 'on_table_{}'.format(on_count)
-                #Grouping all of the on hits into one table
+                #! Spark dataframes are immutable!
+                # on_table_ii['status'] = 'on_table_{}'.format(on_count)
+                on_table_ii = on_table_ii.withColumn(
+                    'status', lit('on_table_{}'.format(on_count)))
+                # Grouping all of the on hits into one table
                 on_table_list.append(on_table_ii)
                 on_count += 1
 
-    #If there are no hits on any on target, return to caller
+    # If there are no hits on any on target, return to caller
     if len(on_table_list) < 1:
-        print('*** find_events: There are no hits in this cadence (on_table_list) :(')
+        print(
+            '*** find_events: There are no hits in this cadence (on_table_list) :(')
         end_search(t0)
         return None
 
-    #Concatenating the on and off tables into a giant on table
-    #and a giant off table
-    on_table = pd.concat(on_table_list,ignore_index=True)
+    # Concatenating the on and off tables into a giant on table
+    # and a giant off table
+    # Can't use pd.concat because on_table_list is a list of Spark dataframes
+    # on_table = pd.concat(on_table_list, ignore_index=True)
+
+    def union_all(dfs):
+        return reduce(DataFrame.unionAll, dfs)
+
+    on_table = union_all(on_table_list)
+
     if len(off_table_list) > 0:
-        off_table = pd.concat(off_table_list,ignore_index=True)
-    else: # nil list of OFF tables
+        # off_table = pd.concat(off_table_list, ignore_index=True)
+        off_table = union_all(off_table_list)
+    else:  # nil list of OFF tables
         off_table = []
 
-    #Check that all targets in the on_table come from the same source
-    #Fix issue where some sources have B'' format
-    uniqlist = list(on_table['Source'].unique())
+    # Check that all targets in the on_table come from the same source
+    # Fix issue where some sources have B'' format
+    # uniqlist = list(on_table['Source'].unique())
+    #! Rewrite ^ this to use Spark
+    uniqlist = on_table.select(col('Source')).distinct().rdd.map(
+        lambda x: x[0]).collect()
+
     for i, ele in enumerate(uniqlist):
         try:
             uniqlist[i] = ele.strip("'B")
@@ -398,14 +438,49 @@ def find_events(dat_file_list, check_zero_drift=False, filter_threshold=3,
                          'on_off_first parameter,'
                          'or complex_cadence.')
 
-    #Obtain the start times for each hit in the first on table
-    ref_time = float(on_table[on_table['status'] == 'on_table_1']['MJD'].unique()[0])
+#! Rewrite ^ this to use Spark
+    # # Strip 'B' from each element of the column
+    # uniqlist = uniqlist.withColumn('value', col('value').substr(2, 100))
 
-    #Calculating and saving delta_t, in seconds, to follow a given hit from
-    #the first ON table to see if it appears in subsequent ON tables
-    on_table['delta_t'] = on_table['MJD'].apply(lambda x:
-        (float(x) - ref_time)*3600*24)
+    # # Drop any rows with null values
+    # uniqlist = uniqlist.na.drop()
 
+    # # Check if there are multiple sources in the column
+    # if uniqlist.distinct().count() > 1:
+    #     raise ValueError('find_events: There are multiple sources in the ON table.'
+    #                      'Please check your input files, '
+    #                      'on_off_first parameter,'
+    #                      'or complex_cadence.')
+#! End rewrite
+
+#! Rewrite to use spark
+    # Obtain the start times for each hit in the first on table
+    pandas_on_table = on_table.toPandas()
+    ref_time = float(pandas_on_table[pandas_on_table['status'] ==
+                     'on_table_1']['MJD'].unique()[0])
+
+    # Calculating and saving delta_t, in seconds, to follow a given hit from
+    # the first ON table to see if it appears in subsequent ON tables
+    pandas_on_table['delta_t'] = pandas_on_table['MJD'].apply(lambda x:
+                                                              (float(x) - ref_time)*3600*24)
+
+    # convert back
+    on_table = spark.createDataFrame(pandas_on_table)
+
+# #! old rewrite
+    # Obtain the start times for each hit in the first on table
+    # ref_time = float(on_table.filter(col('status') == 'on_table_1')
+    #                  .select('MJD')
+    #                  .distinct()
+    #                  .collect()[0]['MJD'])
+
+    # # Calculating and saving delta_t, in seconds, to follow a given hit from
+    # # the first ON table to see if it appears in subsequent ON tables
+    # on_table = on_table.withColumn('delta_t',
+    #                                (unix_timestamp(col('MJD'), 'yyyy-MM-dd HH:mm:ss') - unix_timestamp(str(ref_time), 'yyyy-MM-dd HH:mm:ss')) * 24 * 3600)
+
+
+#! End Rewrite
     #######################################################################
     print('find_events: All data loaded!')
     print()
@@ -421,7 +496,7 @@ def find_events(dat_file_list, check_zero_drift=False, filter_threshold=3,
     # * Passed level 1 AND that are in at least one ON but no OFFs.
     # * Passed level 2 AND that are present in *ALL* ONs.
 
-    #Optionally remove signals that don't have a drift rate
+    # Optionally remove signals that don't have a drift rate
     if check_zero_drift:
         zero_adjusted_table = on_table
     else:
@@ -432,76 +507,148 @@ def find_events(dat_file_list, check_zero_drift=False, filter_threshold=3,
     if SNR_cut is None:
         filter_adjusted_table = zero_adjusted_table
     else:
-        filter_adjusted_table = zero_adjusted_table[ abs(zero_adjusted_table['SNR']) > abs(float(SNR_cut)) ]
+        filter_adjusted_table = zero_adjusted_table[abs(
+            zero_adjusted_table['SNR']) > abs(float(SNR_cut))]
 
     # If min_drift_rate is None, include all signals from the filter_adjusted_table.
     # Else, include only signals with a drift_rate above min_drift_rate.
     if min_drift_rate is not None:
-        filter_adjusted_table = filter_adjusted_table[abs(filter_adjusted_table['DriftRate']) > abs(float(min_drift_rate))]
+        filter_adjusted_table = filter_adjusted_table[abs(
+            filter_adjusted_table['DriftRate']) > abs(float(min_drift_rate))]
 
     # If max_drift_rate is None, include all signals from the filter_adjusted_table.
     # Else, include only signals with a drift_rate below max_drift_rate.
     if max_drift_rate is not None:
-        filter_adjusted_table = filter_adjusted_table[abs(filter_adjusted_table['DriftRate']) < abs(float(max_drift_rate))]
+        filter_adjusted_table = filter_adjusted_table[abs(
+            filter_adjusted_table['DriftRate']) < abs(float(max_drift_rate))]
 
-    #If there are no hits left once SNR adjustments are made,
-    #let the user know, return the zero-drift adjusted table, and end the
-    #search
-    if len(filter_adjusted_table) == 0:
+    # If there are no hits left once SNR adjustments are made,
+    # let the user know, return the zero-drift adjusted table, and end the
+    # search
+    if filter_adjusted_table.count() == 0:
         print('*** find_events: The filter_adjusted_table is empty.  No hits. :(')
         end_search(t0)
         return None
     if filter_threshold == 1:
-        print('find_events (Filter threshold 1): Found a total of %i hits in this cadence!'%len(filter_adjusted_table))
+        print('find_events (Filter threshold 1): Found a total of %i hits in this cadence!' %
+              filter_adjusted_table.count())
         end_search(t0)
         return filter_adjusted_table
-    print('find_events (Filter threshold 2/3): Found a total of %i hits in this cadence!'%len(filter_adjusted_table))
+    print('find_events (Filter threshold 2/3): Found a total of %i hits in this cadence!' %
+          filter_adjusted_table.count())
 
-    #----------------------------------------------------------------------
+    # ----------------------------------------------------------------------
 
-    #Now find how much RFI is within a frequency range of the hit
-    #by comparing the ON to the OFF observations. Update RFI_in_range
-    if len(off_table) == 0:
-        print('find_events: Length of off_table = 0')
-        filter_adjusted_table['RFI_in_range'] = 0
+    # Now find how much RFI is within a frequency range of the hit
+    # by comparing the ON to the OFF observations. Update RFI_in_range
+    # TODO: Fix these len calls
+    #! This oen MAY be a list OR a dataframe
+    # if off_table.count() == 0:
+    #     print('find_events: Length of off_table = 0')
+    #     filter_adjusted_table['RFI_in_range'] = 0
+    # else:
+    #     filter_adjusted_table['RFI_in_range'] = filter_adjusted_table.apply(
+    #         lambda hit:
+    #             off_table[((off_table['Freq'] > calc_freq_range(hit)[0])
+    #                        & (off_table['Freq'] < calc_freq_range(hit)[1])
+    #                        )].count(), axis=1)
+
+#! Rewrite section
+
+    off_table_length = 0
+
+    if isinstance(off_table, list):
+        off_table_length = len(off_table)
+    elif isinstance(off_table, DataFrame):
+        off_table_length = off_table.count()
     else:
-        filter_adjusted_table['RFI_in_range'] = filter_adjusted_table.apply(
-            lambda hit:
-                len(off_table[((off_table['Freq'] > calc_freq_range(hit)[0])
-                               & (off_table['Freq'] < calc_freq_range(hit)[1])
-                               )]), axis=1)
+        raise TypeError(
+            "off_table must be either a list or a PySpark DataFrame")
 
-    #If there is no RFI in range of the hit, it graduates to the
-    #not_in_B_table
+    if off_table_length == 0:
+        print('find_events: Length of off_table = 0')
+        # filter_adjusted_table['RFI_in_range'] = 0
+        filter_adjusted_table = filter_adjusted_table.withColumn(
+            'RFI_in_range', lit(0))
+    else:
+        def count_hits_in_range(hit, off_table):
+            freq_range = calc_freq_range(hit)
+            if isinstance(off_table, list):
+                return sum([1 for record in off_table if freq_range[0] < record['Freq'] < freq_range[1]])
+            elif isinstance(off_table, DataFrame):
+                return off_table.filter((off_table['Freq'] > freq_range[0]) & (off_table['Freq'] < freq_range[1])).count()
+#! End Rewrite
+
+    # def count_hits_in_range(hit, off_table):
+    #     freq_range = calc_freq_range(hit)
+    #     if isinstance(off_table, list):
+    #         return sum([1 for record in off_table if freq_range[0] < record['Freq'] < freq_range[1]])
+    #     elif isinstance(off_table, DataFrame):
+    #         return off_table.filter((off_table['Freq'] > freq_range[0]) & (off_table['Freq'] < freq_range[1])).count()
+
+    def count_hits_in_range(hit, off_table):
+        freq_range = calc_freq_range(hit)
+        if isinstance(off_table, list):
+            return sum([1 for record in off_table if freq_range[0] < record['Freq'] < freq_range[1]])
+        elif isinstance(off_table, DataFrame):
+            return off_table.filter((off_table['Freq'] > freq_range[0]) & (off_table['Freq'] < freq_range[1])).count()
+        elif isinstance(off_table, DataFrame):   # added this condition
+            return off_table.filter((off_table['Freq'] > freq_range[0]) & (off_table['Freq'] < freq_range[1])).count()
+
+    # filter_adjusted_table['RFI_in_range'] = filter_adjusted_table.apply(
+    #     lambda hit: count_hits_in_range(hit, off_table), axis=1)
+
+# Generated
+    from pyspark.sql import Row
+
+    def apply_count_hits(row):
+        # Convert row to dictionary
+        row_dict = row.asDict()
+        # Create new column
+        row_dict['RFI_in_range'] = count_hits_in_range(row_dict, off_table)
+        # Return new Row
+        return Row(**row_dict)
+
+    filter_adjusted_table = filter_adjusted_table.rdd.map(
+        apply_count_hits).toDF()
+# end generated
+
+    # If there is no RFI in range of the hit, it graduates to the
+    # not_in_B_table
     not_in_off_table = filter_adjusted_table[filter_adjusted_table['RFI_in_range'] == 0]
 
-    if len(not_in_off_table) == 0:
+    if not_in_off_table.count() == 0:
         print('find_events (Filter threshold 2/3): Found no hits present in only the on observations for this cadence :(')
         end_search(t0)
         return None
     if filter_threshold == 2:
-        print('find_events (Filter threshold 2): Found a total of %i hits in only the on observations for this cadence!'%len(not_in_off_table))
+        print('find_events (Filter threshold 2): Found a total of %i hits in only the on observations for this cadence!' % len(
+            not_in_off_table))
         end_search(t0)
         return not_in_off_table
 
-    print('find_events: Found a total of %i hits in only the on observations for this cadence!'%len(not_in_off_table))
+    print('find_events: Found a total of %i hits in only the on observations for this cadence!' %
+          not_in_off_table.count())
 
-    #----------------------------------------------------------------------
+    # ----------------------------------------------------------------------
 
     on_but_not_off_table_list = []
     in_all_ons_table = []
-    #Follow the drifting of a hit to find the events that
-    #are present in ALL on observations
+    # Follow the drifting of a hit to find the events that
+    # are present in ALL on observations
+
+    pandas_not_in_off_table = not_in_off_table.toPandas()
 
     for i in range(1, number_of_ons + 1):
-        on_but_not_off_table_list.append(not_in_off_table[not_in_off_table['status'] == 'on_table_{}'.format(i)])
+        on_but_not_off_table_list.append(
+            pandas_not_in_off_table[pandas_not_in_off_table['status'] == 'on_table_{}'.format(i)])
     empty_counter = 0
     for hit_list in on_but_not_off_table_list:
+        #! Spark Dataframe doesn't have empty (this is a pandas dataframe now, though)
         if hit_list.empty is True:
             empty_counter += 1
     if empty_counter == 0:
         first_on = on_but_not_off_table_list[0]
-
 
         def hit_func(hit):
             """
@@ -516,12 +663,29 @@ def find_events(dat_file_list, check_zero_drift=False, filter_threshold=3,
             for ii in range(1, len(on_but_not_off_table_list)):
                 counter += follow_event(hit, on_but_not_off_table_list[ii])
             return counter
-
-
+        # first_on = first_on.toPandas()
         first_on['in_n_ons'] = first_on.apply(hit_func, axis=1)
         in_all_ons_table = first_on[first_on['in_n_ons'] == number_of_ons - 1]
+        #! Trying to fix two lines above
+        # # assuming `on_but_not_off_table_list` is a list that your function needs
+        # def hit_func(hit, on_but_not_off_table_list):
+        #     counter = 0
+        #     for ii in range(1, len(on_but_not_off_table_list)):
+        #         counter += follow_event(hit, on_but_not_off_table_list[ii])
+        #     return counter
 
-        #Create list of events.
+        # hit_func_udf = udf(lambda hit: hit_func(
+        #     hit, on_but_not_off_table_list), IntegerType())
+
+        # # assuming `first_on` is your PySpark DataFrame
+        # first_on = first_on.withColumn(
+        #     'in_n_ons', hit_func_udf(first_on['in_n_ons']))
+
+        # in_all_ons_table = first_on.filter(
+        #     first_on['in_n_ons'] == number_of_ons - 1)
+        #! End trying
+
+        # Create list of events.
         filter_3_event_list = []
 
         # Create an event table of unique entries.
@@ -534,13 +698,15 @@ def find_events(dat_file_list, check_zero_drift=False, filter_threshold=3,
                     filter_3_event_list += [temp_table]
 
     else:
-        print('*** find_events (Filter threshold 3): At least one of the ON tables is empty :(')
+        print(
+            '*** find_events (Filter threshold 3): At least one of the ON tables is empty :(')
         end_search(t0)
         return None
 
     if len(in_all_ons_table) > 0:
         best_events_table = pd.concat(filter_3_event_list)
-        print('find_events: Found a total of {} events across this cadence!'.format(len(best_events_table)))
+        print('find_events: Found a total of {} events across this cadence!'.format(
+            len(best_events_table)))
         end_search(t0)
         return best_events_table
 
