@@ -438,22 +438,6 @@ def find_events(dat_file_list, check_zero_drift=False, filter_threshold=3,
                          'on_off_first parameter,'
                          'or complex_cadence.')
 
-#! Rewrite ^ this to use Spark
-    # # Strip 'B' from each element of the column
-    # uniqlist = uniqlist.withColumn('value', col('value').substr(2, 100))
-
-    # # Drop any rows with null values
-    # uniqlist = uniqlist.na.drop()
-
-    # # Check if there are multiple sources in the column
-    # if uniqlist.distinct().count() > 1:
-    #     raise ValueError('find_events: There are multiple sources in the ON table.'
-    #                      'Please check your input files, '
-    #                      'on_off_first parameter,'
-    #                      'or complex_cadence.')
-#! End rewrite
-
-#! Rewrite to use spark
     # Obtain the start times for each hit in the first on table
     pandas_on_table = on_table.toPandas()
     ref_time = float(pandas_on_table[pandas_on_table['status'] ==
@@ -467,20 +451,6 @@ def find_events(dat_file_list, check_zero_drift=False, filter_threshold=3,
     # convert back
     on_table = spark.createDataFrame(pandas_on_table)
 
-# #! old rewrite
-    # Obtain the start times for each hit in the first on table
-    # ref_time = float(on_table.filter(col('status') == 'on_table_1')
-    #                  .select('MJD')
-    #                  .distinct()
-    #                  .collect()[0]['MJD'])
-
-    # # Calculating and saving delta_t, in seconds, to follow a given hit from
-    # # the first ON table to see if it appears in subsequent ON tables
-    # on_table = on_table.withColumn('delta_t',
-    #                                (unix_timestamp(col('MJD'), 'yyyy-MM-dd HH:mm:ss') - unix_timestamp(str(ref_time), 'yyyy-MM-dd HH:mm:ss')) * 24 * 3600)
-
-
-#! End Rewrite
     #######################################################################
     print('find_events: All data loaded!')
     print()
@@ -541,17 +511,6 @@ def find_events(dat_file_list, check_zero_drift=False, filter_threshold=3,
 
     # Now find how much RFI is within a frequency range of the hit
     # by comparing the ON to the OFF observations. Update RFI_in_range
-    # TODO: Fix these len calls
-    #! This oen MAY be a list OR a dataframe
-    # if off_table.count() == 0:
-    #     print('find_events: Length of off_table = 0')
-    #     filter_adjusted_table['RFI_in_range'] = 0
-    # else:
-    #     filter_adjusted_table['RFI_in_range'] = filter_adjusted_table.apply(
-    #         lambda hit:
-    #             off_table[((off_table['Freq'] > calc_freq_range(hit)[0])
-    #                        & (off_table['Freq'] < calc_freq_range(hit)[1])
-    #                        )].count(), axis=1)
 
 #! Rewrite section
 
@@ -579,13 +538,6 @@ def find_events(dat_file_list, check_zero_drift=False, filter_threshold=3,
                 return off_table.filter((off_table['Freq'] > freq_range[0]) & (off_table['Freq'] < freq_range[1])).count()
 #! End Rewrite
 
-    # def count_hits_in_range(hit, off_table):
-    #     freq_range = calc_freq_range(hit)
-    #     if isinstance(off_table, list):
-    #         return sum([1 for record in off_table if freq_range[0] < record['Freq'] < freq_range[1]])
-    #     elif isinstance(off_table, DataFrame):
-    #         return off_table.filter((off_table['Freq'] > freq_range[0]) & (off_table['Freq'] < freq_range[1])).count()
-
     def count_hits_in_range(hit, off_table):
         freq_range = calc_freq_range(hit)
         if isinstance(off_table, list):
@@ -595,10 +547,6 @@ def find_events(dat_file_list, check_zero_drift=False, filter_threshold=3,
         elif isinstance(off_table, DataFrame):   # added this condition
             return off_table.filter((off_table['Freq'] > freq_range[0]) & (off_table['Freq'] < freq_range[1])).count()
 
-    # filter_adjusted_table['RFI_in_range'] = filter_adjusted_table.apply(
-    #     lambda hit: count_hits_in_range(hit, off_table), axis=1)
-
-# Generated
     from pyspark.sql import Row
 
     def apply_count_hits(row):
@@ -611,7 +559,6 @@ def find_events(dat_file_list, check_zero_drift=False, filter_threshold=3,
 
     filter_adjusted_table = filter_adjusted_table.rdd.map(
         apply_count_hits).toDF()
-# end generated
 
     # If there is no RFI in range of the hit, it graduates to the
     # not_in_B_table
@@ -644,7 +591,6 @@ def find_events(dat_file_list, check_zero_drift=False, filter_threshold=3,
             pandas_not_in_off_table[pandas_not_in_off_table['status'] == 'on_table_{}'.format(i)])
     empty_counter = 0
     for hit_list in on_but_not_off_table_list:
-        #! Spark Dataframe doesn't have empty (this is a pandas dataframe now, though)
         if hit_list.empty is True:
             empty_counter += 1
     if empty_counter == 0:
@@ -663,27 +609,9 @@ def find_events(dat_file_list, check_zero_drift=False, filter_threshold=3,
             for ii in range(1, len(on_but_not_off_table_list)):
                 counter += follow_event(hit, on_but_not_off_table_list[ii])
             return counter
-        # first_on = first_on.toPandas()
+
         first_on['in_n_ons'] = first_on.apply(hit_func, axis=1)
         in_all_ons_table = first_on[first_on['in_n_ons'] == number_of_ons - 1]
-        #! Trying to fix two lines above
-        # # assuming `on_but_not_off_table_list` is a list that your function needs
-        # def hit_func(hit, on_but_not_off_table_list):
-        #     counter = 0
-        #     for ii in range(1, len(on_but_not_off_table_list)):
-        #         counter += follow_event(hit, on_but_not_off_table_list[ii])
-        #     return counter
-
-        # hit_func_udf = udf(lambda hit: hit_func(
-        #     hit, on_but_not_off_table_list), IntegerType())
-
-        # # assuming `first_on` is your PySpark DataFrame
-        # first_on = first_on.withColumn(
-        #     'in_n_ons', hit_func_udf(first_on['in_n_ons']))
-
-        # in_all_ons_table = first_on.filter(
-        #     first_on['in_n_ons'] == number_of_ons - 1)
-        #! End trying
 
         # Create list of events.
         filter_3_event_list = []
