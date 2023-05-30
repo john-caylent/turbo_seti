@@ -5,8 +5,9 @@
     "releaseLabel": "emr-6.9.0-latest", 
     "jobDriver": {
       "sparkSubmitJobDriver": {
-        "entryPoint": "s3://sandbox-terraform-aws-caylenttwo-emr/scripts/spark-python-distributed.py", 
-         "sparkSubmitParameters": "--conf spark.executor.instances=1 --conf spark.executor.memory=2G --conf spark.driver.memory=2G --conf spark.executor.cores=1 --conf spark.driver.cores=1"
+        "entryPoint": "s3://sandbox-terraform-aws-caylenttwo-emr/scripts/spark-python-distributed.py",
+        "entryPointArguments": ["complete"], 
+        "sparkSubmitParameters": "--conf spark.executor.instances=2 --conf spark.executor.memory=512MB --conf spark.driver.memory=2G --conf spark.executor.cores=1 --conf spark.driver.cores=1"
       }
     }, 
     "configurationOverrides": {
