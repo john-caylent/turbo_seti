@@ -1,0 +1,32 @@
+{
+    "name": "distributed-data-test", 
+    "virtualClusterId": "fahli0pb3tz2dkgpqm7y3trr1", 
+    "executionRoleArn": "arn:aws:iam::479305653407:role/terraform-aws-caylenttwo-emr-eks-data-team-b", 
+    "releaseLabel": "emr-6.9.0-latest", 
+    "jobDriver": {
+      "sparkSubmitJobDriver": {
+        "entryPoint": "s3://sandbox-terraform-aws-caylenttwo-emr/scripts/spark-python-distributed.py",
+        "entryPointArguments": ["complete"], 
+        "sparkSubmitParameters": "--conf spark.executor.instances=2 --conf spark.executor.memory=512MB --conf spark.driver.memory=2G --conf spark.executor.cores=1 --conf spark.driver.cores=1"
+      }
+    }, 
+    "configurationOverrides": {
+      "applicationConfiguration": [
+        {
+          "classification": "spark-defaults", 
+          "properties": {
+            "spark.kubernetes.container.image": "479305653407.dkr.ecr.us-east-1.amazonaws.com/seti-vcluster-poc:emr-6.9"
+          }
+        }
+      ], 
+      "monitoringConfiguration": {
+        "cloudWatchMonitoringConfiguration": {
+          "logGroupName": "/aws/eks/terraform-aws-caylenttwo/emr-vcluster",
+          "logStreamNamePrefix": "emr-data-team-b"
+          }, 
+        "s3MonitoringConfiguration": {
+          "logUri": "s3://sandbox-terraform-aws-caylenttwo-emr"
+        }
+      }
+    }
+  }

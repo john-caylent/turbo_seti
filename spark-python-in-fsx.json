@@ -1,5 +1,5 @@
 {
-  "name": "spark-python-in-image", 
+  "name": "test-aws-cli-fsx", 
   "virtualClusterId": "fahli0pb3tz2dkgpqm7y3trr1", 
   "executionRoleArn": "arn:aws:iam::479305653407:role/terraform-aws-caylenttwo-emr-eks-data-team-b", 
   "releaseLabel": "emr-6.9.0-latest", 
